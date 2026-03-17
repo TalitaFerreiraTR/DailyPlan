@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "DailyPlan | Product Focus",
+  "version": "6.0",
+  "description": "Foco em produto: PSAI, SS, SAI e mais",
+  "permissions": ["storage", "activeTab", "scripting", "tabs"],
+  "host_permissions": [
+    "https://*.dominiosistemas.com.br/*",
+    "http://*.dominiosistemas.com.br/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "action": {
+    "default_icon": { "16": "icon.png", "48": "icon.png", "128": "icon.png" }
+  },
+  "icons": { "16": "icon.png", "48": "icon.png", "128": "icon.png" },
+  "content_scripts": [
+    {
+      "matches": ["https://sgd.dominiosistemas.com.br/sgsa/faces/psai.html*"],
+      "js": ["injetor-psai.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://sgd.dominiosistemas.com.br/sgsa/faces/ss.html*"],
+      "js": ["content-ss-scraper.js","injector-ss.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://sgsai.dominiosistemas.com.br/sgsai/faces/sai.html*"],
+      "js": ["injector-sai.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

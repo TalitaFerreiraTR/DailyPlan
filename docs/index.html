@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DailyPlan | Product Focus</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --bg-body: #f3f4f6; --bg-sidebar: #ffffff; --bg-card: #ffffff; --bg-input: #ffffff; --border-color: #e5e7eb; --text-primary: #111827; --text-secondary: #6b7280; --tr-orange: #ff8000; --tr-orange-hover: #e67300; --active-blue: #2563eb; --active-bg: #eff6ff; --danger: #ef4444; --success: #10b981; --warning: #f59e0b; --shadow-sm: 0 1px 2px rgba(0,0,0,0.05); }
+        body.dark-mode { --bg-body: #111827; --bg-sidebar: #1f2937; --bg-card: #1f2937; --bg-input: #374151; --border-color: #374151; --text-primary: #f9fafb; --text-secondary: #9ca3af; --tr-orange: #ff8000; --tr-orange-hover: #e67300; --active-blue: #60a5fa; --active-bg: #1e3a8a; }
+        * { box-sizing: border-box; } 
+        
+        /* Layout Híbrido */
+        html, body { margin: 0; padding: 0; height: 100vh; overflow: hidden; }
+        body { font-family: 'Inter', sans-serif; display: flex; background-color: var(--bg-body); color: var(--text-primary); transition: background-color 0.3s; width: 100%; min-width: 780px; }
+        body.auth-required #sidebar, body.auth-required #main { visibility: hidden; }
+        @media (max-width: 800px) { body { width: 780px; height: 600px; } }
+        
+        #sidebar { width: 260px; background: var(--bg-sidebar); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; z-index: 10; flex-shrink: 0; }
+        #sidebar-header { padding: 12px 12px 10px 15px; border-bottom: none; display: flex; flex-direction: row; align-items: center; min-height: auto; }
+        #sidebar-header .tr-brand-area { flex: 1; min-width: 0; }
+        .tr-logo-lockup { display: flex; align-items: center; gap: 8px; } .tr-kinesis-svg { width: 24px; height: 24px; fill: var(--tr-orange); flex-shrink: 0; } .tr-wordmark { font-size: 13px; font-weight: 700; color: var(--text-primary); line-height: 1.2; letter-spacing: -0.5px; white-space: nowrap; }
+        #sidebar-icons { display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 6px; padding: 8px 12px 10px 15px; border-bottom: 1px solid var(--border-color); }
+        .header-btn { background: transparent; border: none; color: var(--text-secondary); border-radius: 4px; width: 22px; height: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; padding: 0; flex-shrink: 0; }
+        .header-btn:hover { color: var(--tr-orange); background: rgba(255, 128, 0, 0.1); }
+        .header-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+        .icon-outline { stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+        .icon-outline path, .icon-outline circle, .icon-outline rect { stroke: inherit; fill: none; }
+        
+        #case-list { flex: 1; overflow-y: auto; padding: 10px; min-height: 0; }
+        .case-item { display: flex; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; transition: 0.2s; margin-bottom: 8px; position: relative; background: var(--bg-card); border-left: 4px solid #3b82f6; min-height: 52px; }
+        .case-item:hover { background: var(--bg-input); border-color: var(--tr-orange); }
+        .case-item.active { background: var(--active-bg); border: 1px solid var(--active-blue); border-left: 4px solid var(--active-blue) !important; }
+        .case-item .case-item-id { font-size: 11px; font-weight: 700; color: var(--text-secondary); margin-bottom: 2px; flex-shrink: 0; }
+        .case-item .case-item-desc { font-size: 12px; color: var(--text-primary); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; min-height: 2.7em; }
+        .case-item .case-item-body { flex: 1; min-width: 0; overflow: hidden; }
+        .case-item .case-item-tag { flex-shrink: 0; font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 6px; margin-left: 8px; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .case-item-tag.tag-urgente { background: rgba(239,68,68,0.15); color: #dc2626; }
+        .case-item-tag.tag-definicao { background: rgba(59,130,246,0.15); color: #2563eb; }
+        .case-item-tag.tag-concluido { background: rgba(16,185,129,0.15); color: #059669; }
+        .case-item-tag.tag-em-definicao { background: rgba(16,185,129,0.15); color: #059669; }
+        .case-item-tag.tag-aguard { background: rgba(255,128,0,0.2); color: #e67300; }
+        .case-item-tag.tag-fila { background: rgba(234,179,8,0.25); color: #ca8a04; }
+        .case-item.bar-urgente { border-left-color: #ef4444; }
+        .case-item.bar-definicao { border-left-color: #3b82f6; }
+        .case-item.bar-concluido { border-left-color: #10b981; }
+        .case-item.bar-prescrita { border-left-color: #6366f1; }
+        .case-item-tag.tag-prescrita { background: rgba(99, 102, 241, 0.15); color: #4f46e5; }
+        .case-item.bar-em-definicao { border-left-color: #10b981; }
+        .case-item.bar-aguard { border-left-color: #ff8000; }
+        .case-item.bar-fila { border-left-color: #eab308; }
+
+        #sidebar-footer { padding: 16px 15px; border-top: 1px solid var(--border-color); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; }
+        .footer-main { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; width: 100%; max-width: 220px; margin: 0 auto; }
+        #add-btn { width: 100%; padding: 12px 20px; background: var(--tr-orange); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+        #add-btn:hover { background: var(--tr-orange-hover); }
+        #add-btn svg { flex-shrink: 0; stroke: currentColor; }
+        .btn-with-icon { display: inline-flex; align-items: center; gap: 6px; }
+        .footer-links { display: flex; flex-direction: row; flex-wrap: nowrap; align-items: center; justify-content: space-between; width: 100%; min-width: 0; }
+        .footer-link { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-secondary); cursor: pointer; background: none; border: none; padding: 6px 4px; white-space: nowrap; }
+        .footer-link:hover { color: var(--tr-orange); }
+        .sync-section { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color); }
+        .sync-input { width: 100%; padding: 6px 8px; font-size: 11px; margin-bottom: 6px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-input); color: var(--text-primary); }
+        .sync-check { display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; margin-bottom: 4px; }
+        .sync-status { font-size: 10px; margin: 6px 0 0; min-height: 14px; color: var(--text-secondary); }
+        .search-results-list { max-height: 280px; overflow-y: auto; }
+        .search-results-list .search-result-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px; margin-bottom: 6px; cursor: pointer; background: var(--bg-card); transition: 0.2s; }
+        .search-results-list .search-result-item:hover { border-color: var(--tr-orange); background: rgba(255,128,0,0.06); }
+        .search-results-list .search-result-item .sr-id { font-size: 11px; font-weight: 700; color: var(--text-secondary); }
+        .search-results-list .search-result-item .sr-desc { font-size: 12px; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; margin: 0 8px; }
+        .dashboard-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-bottom: 10px; }
+        .dashboard-stat { background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 6px; padding: 12px; text-align: center; }
+        .dashboard-stat .val { font-size: 20px; font-weight: 700; color: var(--tr-orange); }
+        .dashboard-stat .lbl { font-size: 10px; text-transform: uppercase; color: var(--text-secondary); margin-top: 4px; }
+        .dashboard-list { margin-top: 8px; }
+        .dashboard-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px; margin-bottom: 6px; cursor: pointer; transition: 0.2s; background: var(--bg-card); }
+        .dashboard-item:hover { border-color: var(--tr-orange); background: rgba(255,128,0,0.05); }
+        .dashboard-item .d-title { flex: 1; font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .dashboard-item .d-meta { font-size: 11px; color: var(--text-secondary); }
+        .dashboard-item .d-level { font-size: 10px; padding: 2px 6px; border-radius: 4px; background: var(--bg-input); }
+        .dashboard-item .d-score { font-weight: 700; color: var(--tr-orange); }
+        .dashboard-item .d-score-date { font-size: 10px; color: var(--text-secondary); margin-left: 4px; }
+        #modal-dashboard .modal-content { border-radius: 8px; overflow: hidden; max-width: 560px !important; }
+        #modal-dashboard .modal-header { font-size: 14px; }
+        #modal-dashboard .modal-body { padding: 16px; }
+        #modal-dashboard .dashboard-stats { grid-template-columns: repeat(2, 1fr); }
+        .dashboard-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+        .dashboard-chart-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; }
+        .dashboard-chart-card h4 { margin: 0 0 8px; font-size: 11px; text-transform: uppercase; color: var(--text-secondary); }
+        .chart-donut { width: 100px; height: 100px; border-radius: 50%; margin: 0 auto 8px; }
+        .chart-legend { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; font-size: 10px; }
+        .chart-legend span { display: flex; align-items: center; gap: 4px; }
+        .chart-legend .dot { width: 8px; height: 8px; border-radius: 50%; }
+        .chart-bars { display: flex; align-items: flex-end; gap: 6px; height: 70px; padding: 8px 0; }
+        .chart-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 0; }
+        .chart-bar { width: 80%; max-width: 24px; min-height: 4px; border-radius: 4px 4px 0 0; background: var(--tr-orange); transition: height 0.3s; }
+        .chart-bar-lbl { font-size: 9px; color: var(--text-secondary); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+        .chart-line-wrap { width: 100%; padding: 8px 0; }
+        .chart-line-wrap svg { display: block; width: 100%; height: 120px; }
+        .chart-line-legend { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; font-size: 10px; margin-top: 8px; }
+        .chart-line-legend span { display: flex; align-items: center; gap: 4px; }
+        .chart-line-legend .dot { width: 8px; height: 8px; border-radius: 50%; }
+        .chart-bars-dual { height: 72px; }
+        .chart-bars-dual .chart-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 0; }
+        .chart-bars-group { display: flex; align-items: flex-end; justify-content: center; gap: 3px; height: 44px; width: 100%; }
+        .chart-bars-dual .chart-bar { width: 14px; max-width: none; min-height: 2px; border-radius: 4px 4px 0 0; transition: height 0.3s; }
+        .chart-bars-dual .chart-bar-psai { background: var(--tr-orange); }
+        .chart-bars-dual .chart-bar-sai { background: #10b981; }
+        #modal-dashboard .dashboard-charts { grid-template-columns: 1fr; }
+        #modal-dashboard .dashboard-charts .chart-line-card { grid-column: 1; }
+        .work-type-filter { padding: 0; margin: 0; display: flex; align-items: stretch; background: var(--bg-sidebar); border-bottom: 1px solid var(--border-color); }
+        .filter-chip { flex: 1; padding: 12px 8px; font-size: 12px; font-weight: 600; border: 1px solid var(--border-color); border-bottom: none; border-radius: 8px 8px 0 0; margin-bottom: -1px; margin-right: 2px; background: var(--bg-sidebar); color: var(--text-secondary); cursor: pointer; transition: 0.2s; text-align: center; }
+        .filter-chip:last-child { margin-right: 0; }
+        .filter-chip:hover { color: var(--text-primary); background: var(--bg-input); }
+        .filter-chip.active { color: var(--text-primary); background: var(--bg-card); border-color: var(--border-color); border-bottom: 1px solid var(--bg-card); position: relative; z-index: 1; color: var(--tr-orange); }
+        .psai-dominio-btn.active { background: var(--tr-orange); color: white; border-color: var(--tr-orange); }
+        .psai-reuniao-duvida-box { border: 2px solid #dc2626 !important; background: rgba(220,38,38,0.12) !important; }
+        body.dark-mode .psai-reuniao-duvida-box { background: rgba(220,38,38,0.2) !important; }
+        .new-version-banner { padding: 10px 12px; margin: 0 8px 8px; background: rgba(234, 179, 8, 0.2); border: 1px solid #eab308; border-radius: 6px; font-size: 11px; color: var(--text-primary); }
+        .new-version-banner .new-version-text { margin-bottom: 6px; }
+        .new-version-banner .new-version-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+        .empty-state-title { font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 16px; }
+        .work-type-buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px; }
+        .work-type-btn { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 20px 24px; border: 2px solid var(--border-color); border-radius: 8px; background: var(--bg-card); color: var(--text-primary); cursor: pointer; transition: 0.2s; min-width: 100px; }
+        .work-type-btn:hover { border-color: var(--tr-orange); background: rgba(255,128,0,0.08); color: var(--tr-orange); }
+        .work-type-btn .wt-icon { font-size: 28px; }
+        .empty-state-hint { font-size: 12px; color: var(--text-secondary); }
+        .section-hint { font-size: 11px; color: var(--text-secondary); margin: 0; }
+        .panel-general { display: none; flex-direction: column; gap: 20px; padding-bottom: 50px; }
+        .panel-general.active { display: flex; }
+        .ss-section { display: block; }
+        .ss-row-three { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 24px; width: 100%; margin: 10px 0; flex-wrap: wrap; }
+        .ss-row-three-checkbox { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+        .ss-row-three-checkbox label { margin: 0; white-space: nowrap; font-size: 12px; }
+        .ss-row-three-select { flex: 1; min-width: 140px; max-width: 220px; }
+        .ss-row-three-select label { display: block; margin-bottom: 4px; }
+        .ss-row-three-select select { width: 100%; }
+        .ss-title-auto { font-size: 12px; color: var(--text-secondary); padding: 8px 10px; background: var(--bg-input); border-radius: 4px; margin-bottom: 10px; }
+        .btn-ler-ss { background: var(--tr-orange); color: white; border: none; border-radius: 6px; padding: 10px 16px; font-weight: 600; font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-ler-ss:hover { background: var(--tr-orange-hover); }
+        .btn-ler-ss-aba { background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 12px; font-weight: 600; font-size: 11px; cursor: pointer; }
+        .btn-ler-ss-aba:hover { border-color: var(--tr-orange); color: var(--tr-orange); }
+        .ss-tramites-badge { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 12px; background: var(--active-bg); color: var(--active-blue); border: 1px solid var(--active-blue); }
+        .ss-parse-textarea { width: 100%; min-height: 120px; padding: 10px; font-size: 11px; font-family: monospace; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-input); color: var(--text-primary); resize: vertical; }
+        
+        #main { flex: 1; display: flex; flex-direction: column; background-color: var(--bg-body); overflow: hidden; position: relative; min-width: 0; }
+        #main #empty-state { display: flex; flex: 1; align-items: center; justify-content: center; min-height: 200px; }
+        #main #empty-state.hidden { display: none !important; }
+        #main #content-area { display: none !important; flex: 1; flex-direction: column; min-height: 0; }
+        #main #content-area.content-area-visible { display: flex !important; }
+        #main #group-view { display: none !important; flex: 1; flex-direction: column; min-height: 0; }
+        #main #group-view.group-view-visible { display: flex !important; }
+        .group-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; color: var(--text-primary); background: var(--bg-input); border: 1px solid var(--border-color); margin-bottom: 6px; }
+        .group-item:hover { border-color: var(--tr-orange); background: rgba(255,128,0,0.08); }
+        .group-item.active { background: var(--active-bg); border-color: var(--active-blue); color: var(--tr-orange); }
+        .group-item-count { font-size: 11px; font-weight: 700; color: var(--text-secondary); }
+        .group-view-case-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; background: var(--bg-card); transition: 0.2s; }
+        .group-view-case-item:hover { border-color: var(--tr-orange); background: rgba(255,128,0,0.06); }
+        .group-view-case-id { font-size: 11px; font-weight: 700; color: var(--text-secondary); flex-shrink: 0; }
+        .group-view-case-title { font-size: 13px; color: var(--text-primary); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .group-view-case-remove { flex-shrink: 0; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: 4px; background: transparent; color: var(--text-secondary); cursor: pointer; font-size: 14px; padding: 0; }
+        .group-view-case-remove:hover { background: rgba(200,60,60,0.15); color: var(--danger, #c0392b); }
+        .new-group-cases-list .new-group-case-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; cursor: pointer; font-size: 12px; color: var(--text-primary); border-bottom: 1px solid var(--border-color); }
+        .new-group-cases-list .new-group-case-row:last-child { border-bottom: none; }
+        .new-group-cases-list .new-group-case-row input[type="checkbox"] { flex-shrink: 0; width: 18px; height: 18px; margin: 0; accent-color: var(--tr-orange); }
+        .new-group-cases-list .new-group-case-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.3; }
+        .tabs-header { display: flex; gap: 5px; padding: 15px 20px 0; background: var(--bg-body); flex-shrink: 0; border-bottom: 1px solid var(--border-color); align-items: flex-end;}
+        .tab-btn { background: rgba(0,0,0,0.05); border: 1px solid transparent; border-bottom: none; border-radius: 6px 6px 0 0; padding: 8px 15px; font-size: 11px; font-weight: 600; color: var(--text-secondary); cursor: pointer; transition: 0.2s; text-transform: uppercase; position: relative; top: 1px; }
+        .dark-mode .tab-btn { background: rgba(255,255,255,0.05); } .tab-btn:hover { color: var(--text-primary); }
+        .tab-btn.active { background: var(--bg-body); color: var(--tr-orange); border: 1px solid var(--border-color); border-bottom-color: var(--bg-body); z-index: 2; }
+        .dark-mode .tab-btn.active { background: var(--bg-body); border-bottom-color: var(--bg-body); }
+        .scroll-container { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; }
+        .tab-content { display: none; width: 100%; flex-direction: column; gap: 20px; padding-bottom: 50px; } .tab-content.active { display: flex; }
+        .card { background: var(--bg-card); border-radius: 8px; box-shadow: var(--shadow-sm); border: 1px solid var(--border-color); padding: 20px; margin-bottom: 10px; }
+        .card-header-toggle { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -4px 0 0 0; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; cursor: pointer; user-select: none; }
+        .card-header-toggle h3, .card-header-toggle h4 { margin: 0; border: none; padding: 0; }
+        .card-collapsible.card-minimized .card-body-toggle { display: none !important; }
+        .card-collapsible.card-minimized .card-header-toggle { margin-bottom: 0; border-bottom: none; padding-bottom: 0; }
+        .card-collapsible .card-header-toggle .card-toggle-btn svg { transition: transform 0.2s; }
+        .card-collapsible.card-minimized .card-header-toggle .card-toggle-btn svg { transform: rotate(-90deg); }
+        
+        h3 { margin: 0 0 15px 0; font-size: 13px; font-weight: 700; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 8px; display:flex; justify-content: space-between; align-items: center; text-transform: uppercase;}
+        .card.card-section > h3 { background: transparent; text-align: left; font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; padding-bottom: 4px; justify-content: space-between; align-items: center; }
+        .card.card-section .card-header-toggle h3 { font-size: 11px; font-weight: 600; color: var(--text-secondary); }
+        .card.card-section > h3 .card-title-text, .card.card-section .card-header-toggle h3 .card-title-text { display: inline-flex; align-items: center; gap: 6px; }
+        label { display: block; margin-top: 10px; font-weight: 600; font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; text-transform: uppercase; }
+        input, select, textarea { width: 100%; padding: 8px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); font-size: 13px; outline: none; font-family: 'Inter', sans-serif; }
+        input:focus, select:focus, textarea:focus { border-color: var(--tr-orange); } textarea { resize: vertical; min-height: 50px; }
+        .compact-input-container { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px 12px; box-shadow: var(--shadow-sm); } .compact-input-container input { border: none; background: transparent; padding: 0; margin: 0; box-shadow: none; width:100%; outline:none;} .compact-input-container:focus-within { border-color: var(--tr-orange); }
+        
+        .footer-actions { margin-top: auto; padding-top: 20px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .btn-action { padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: 0.2s; border: 1px solid transparent; min-height: 36px; box-sizing: border-box; }
+        .btn-primary { background: var(--tr-orange); color: white; border-color: var(--tr-orange); } .btn-primary:hover { background: var(--tr-orange-hover); border-color: var(--tr-orange-hover); }
+        .btn-secondary { background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-primary); } .dark-mode .btn-secondary { background: var(--bg-input); } .btn-secondary:hover { border-color: var(--tr-orange); color: var(--tr-orange); background: rgba(255, 128, 0, 0.08); }
+        .btn-danger { background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-secondary); width: 36px; height: 36px; min-width: 36px; display: inline-flex; align-items: center; justify-content: center; padding: 0; } .btn-danger:hover { color: var(--danger); border-color: var(--danger); background: rgba(239, 68, 68, 0.1); }
+        
+        /* LINK ROW */
+        .link-row { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-card); box-shadow: var(--shadow-sm); }
+        .link-row-top { display: flex; gap: 8px; align-items: center; width: 100%; }
+        .link-row-top-spacer { flex: 1; }
+        .link-row-url { width: 100%; }
+        .link-row-url input { font-size: 11px; color: var(--text-secondary); }
+        .link-row-bottom { width: 100%; }
+        .remove-btn { background: transparent; color: var(--danger); border: 1px solid var(--border-color); width: 28px; height: 28px; cursor: pointer; border-radius: 4px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; } .remove-btn:hover { background: var(--danger); color: white; border-color: var(--danger); }
+        .research-topic { margin-bottom: 18px; }
+        .research-topic:last-child { margin-bottom: 0; }
+        .research-topic-title { font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; }
+        .card-research > h3, .card-research .research-topic-title { font-weight: 400; }
+        
+        /* GESTOR REVIEWS */
+        .manager-row { background: rgba(255, 128, 0, 0.03); border: 1px solid var(--border-color); border-left: 3px solid var(--tr-orange); padding: 10px; margin-bottom: 10px; border-radius: 4px; }
+        .manager-header { display: flex; gap: 8px; margin-bottom: 8px; }
+        .manager-date { width: 110px; font-size: 11px; }
+        .manager-who { flex: 1; font-size: 12px; font-weight: 600; }
+        .manager-reason { width: 100%; font-size: 12px; color: var(--text-secondary); }
+
+        /* SAIPainel – layout em 4 linhas, labels all caps #666, grid rigoroso */
+        .section-sai .sai-label { display: block; font-size: 11px; font-weight: 600; color: #666; margin-bottom: 4px; text-transform: uppercase; margin-top: 0; }
+        body.dark-mode .section-sai .sai-label { color: #9ca3af; }
+        .section-sai .sai-grid-row { display: grid; gap: 12px; margin-bottom: 12px; align-items: start; }
+        .section-sai .sai-grid-row-1 { grid-template-columns: 1.2fr 1.2fr 0.8fr 1fr; }
+        .section-sai .sai-grid-row-2 { grid-template-columns: 1fr 1fr 1fr; }
+        .section-sai .sai-grid-row-3 { margin-bottom: 12px; }
+        .section-sai .sai-grid-row-4 { margin-bottom: 0; }
+        .section-sai .sai-cod-wrap { display: flex; gap: 6px; align-items: center; }
+        .section-sai .sai-cod-wrap input { flex: 1; min-width: 0; }
+        .section-sai .sai-cod-wrap .btn-open-sai-wrap { flex-shrink: 0; }
+        .section-sai .sai-obs-textarea { min-height: 100px; resize: vertical; width: 100%; }
+
+        /* SSPainel – layout 5 linhas + Detalhamento + Rodapé, labels #666 all caps, botão Ler da Aba flutuante */
+        .section-ss .ss-label { display: block; font-size: 11px; font-weight: 600; color: #666; margin-bottom: 4px; text-transform: uppercase; margin-top: 0; }
+        body.dark-mode .section-ss .ss-label { color: #9ca3af; }
+        .section-ss .ss-header-row { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; position: relative; }
+        .section-ss .ss-header-left { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+        .section-ss .ss-header-right { margin-left: auto; }
+        .section-ss .ss-float-btn { flex-shrink: 0; }
+        .section-ss .ss-grid-row { display: grid; gap: 12px; margin-bottom: 12px; align-items: start; }
+        .section-ss .ss-grid-row-1 { grid-template-columns: 1.2fr 1fr 1fr 1.2fr; }
+        .section-ss .ss-cod-wrap { display: flex; gap: 6px; align-items: center; }
+        .section-ss .ss-cod-wrap input { flex: 1; min-width: 0; }
+        .section-ss .ss-detalhe-title { margin: 0 0 12px; font-size: 11px; font-weight: 600; color: #666; text-transform: uppercase; padding-top: 16px; border-top: 1px solid var(--border-color); }
+        body.dark-mode .section-ss .ss-detalhe-title { color: #9ca3af; }
+        .section-ss .ss-resumo-footer { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border-color); }
+        .section-ss .ss-textarea { min-height: 80px; resize: vertical; width: 100%; }
+        /* Checkbox "Situação ocorre apenas no Banco de Dados do Cliente" - container único, flex-row, à esquerda */
+        .section-ss .ss-banco-cliente-row { display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; margin-top: 16px; margin-bottom: 8px; width: 100%; }
+        .section-ss .ss-banco-cliente-row input[type="checkbox"] { width: 16px; height: 16px; flex-shrink: 0; margin: 0; border-radius: 4px; border: 1px solid var(--border-color); cursor: pointer; accent-color: var(--tr-orange); }
+        .section-ss .ss-banco-cliente-label { font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase; margin: 0; cursor: pointer; white-space: nowrap; }
+        body.dark-mode .section-ss .ss-banco-cliente-label { color: #9ca3af; }
+
+        /* PsaiPainel – linha de cabeçalho alinhada aos demais cards: Cód. PSAI | Nível | Data (grid) */
+        .section-psai .psai-label { display: block; font-size: 11px; font-weight: 600; color: #666; margin-bottom: 4px; text-transform: uppercase; margin-top: 0; }
+        body.dark-mode .section-psai .psai-label { color: #9ca3af; }
+        .section-psai .psai-header-row { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 12px; margin-bottom: 16px; align-items: end; }
+        .section-psai .psai-cod-wrap { display: flex; gap: 6px; align-items: center; min-width: 0; }
+        .section-psai .psai-cod-wrap input { flex: 1; min-width: 0; box-sizing: border-box; }
+        .section-psai .psai-nivel-wrap { min-width: 0; }
+        .section-psai .psai-nivel-wrap select { width: 100%; }
+        .section-psai .psai-data-wrap { min-width: 0; }
+        .section-psai .psai-data-wrap input { width: 100%; }
+
+        #save-status { font-size: 11px; color: var(--success); font-weight: 600; opacity: 0; transition: opacity 0.5s; margin-right: 10px; text-transform: uppercase;}
+        .hidden { display: none !important; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; } .dark-mode ::-webkit-scrollbar-thumb { background: #4b5563; }
+        
+        /* EDITOR NATIVO (Sem Quill) */
+        .rich-editor-container { border: 1px solid var(--border-color); border-radius: 6px; margin-bottom: 20px; transition: 0.2s; background: var(--bg-card); box-shadow: var(--shadow-sm); } .rich-editor-container:focus-within { border-color: var(--tr-orange); }
+        .toolbar { display: flex; gap: 4px; padding: 6px 8px; border-bottom: 1px solid var(--border-color); background: rgba(0,0,0,0.02); border-radius: 6px 6px 0 0; }
+        .toolbar button { background: transparent; border: 1px solid transparent; color: var(--text-secondary); width: 26px; height: 26px; border-radius: 4px; cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-family: serif; }
+        .toolbar button:hover { background: rgba(0,0,0,0.05); color: var(--text-primary); border-color: var(--border-color); }
+        .rich-input { min-height: 80px; height: auto; overflow-y: hidden; padding: 10px 12px; color: var(--text-primary); outline: none; line-height: 1.5; font-size: 13px; background: var(--bg-card); border-radius: 0 0 6px 6px; }
+        .rich-input:empty:before { content: attr(placeholder); color: var(--text-secondary); opacity: 0.5; }
+
+        /* MODAIS */
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; justify-content: center; align-items: center; opacity: 0; pointer-events: none; transition: 0.2s; }
+        .modal.visible { opacity: 1; pointer-events: auto; }
+        .modal-content { background: var(--bg-card); width: 400px; max-height: 80vh; border-radius: 8px; border: 1px solid var(--border-color); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        .modal-header { padding: 15px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: var(--bg-body); }
+        .modal-body { padding: 15px; overflow-y: auto; background: var(--bg-card); flex:1;}
+        .deadline-item { padding: 10px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: 0.2s; } .deadline-item:hover { background: var(--bg-input); }
+        .deadline-date { font-size: 11px; font-weight: 700; margin-bottom: 4px; display: block; }
+        .d-expired { color: var(--danger); } .d-today { color: var(--warning); } .d-future { color: var(--success); }
+        .deadline-title { font-size: 13px; color: var(--text-primary); }
+        
+        .summary-block { margin-bottom: 10px; border-radius: 4px; overflow: hidden; border: 1px solid var(--border-color); }
+        .summary-header { font-size: 10px; text-transform: uppercase; font-weight: 700; padding: 5px 10px; display: flex; align-items: center; gap: 5px; }
+        .summary-header.alert { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
+        .summary-header.info { background: rgba(255, 128, 0, 0.1); color: var(--tr-orange); }
+        .summary-header.normal { background: var(--bg-input); color: var(--text-secondary); }
+        .summary-header.context { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+        .summary-content { padding: 8px; background: var(--bg-card); }
+        .summary-item { font-size: 11px; margin-bottom: 5px; color: var(--text-primary); line-height: 1.4; border-bottom: 1px solid rgba(0,0,0,0.05); padding-bottom: 3px; }
+        .summary-divergent { background: rgba(255, 0, 0, 0.05); border: 1px dashed var(--danger); margin-top: 10px; padding: 8px; border-radius: 4px; }
+        .summary-divergent strong { color: var(--danger); display:block; margin-bottom:5px; text-transform: uppercase; font-size:11px;}
+        .summary-resumo p { margin: 0 0 4px 0; font-size: 12px; line-height: 1.45; color: var(--text-primary); }
+        .summary-leitura p { margin: 0; font-size: 12px; line-height: 1.5; color: var(--text-primary); }
+        .summary-footer { font-size: 12px; color: var(--text-secondary); margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color); display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .summary-sa-link { color: var(--tr-orange); text-decoration: none; font-weight: 600; }
+        .summary-sa-link:hover { text-decoration: underline; }
+        .summary-sa-line { display: flex; align-items: flex-start; gap: 6px; font-size: 12px; line-height: 1.4; margin-bottom: 6px; color: var(--text-primary); }
+        .summary-sa-line .summary-sa-text { flex: 1; }
+        .remove-sa-btn { flex-shrink: 0; background: transparent; border: 1px solid var(--border-color); color: var(--danger); width: 22px; height: 22px; border-radius: 4px; cursor: pointer; font-size: 11px; padding: 0; }
+        .remove-sa-btn:hover { background: var(--danger); color: white; }
+        .add-sa-form { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color); }
+        .add-sa-label { display: block; font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; text-transform: uppercase; }
+        .add-sa-form .add-sa-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .add-sa-form input { padding: 8px 10px; font-size: 12px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-input); color: var(--text-primary); }
+        .add-sa-form input::placeholder { color: var(--text-secondary); opacity: 0.8; }
+        .add-sa-form #new-sa-code { width: 95px; flex-shrink: 0; }
+        .add-sa-form #new-sa-url { flex: 1; min-width: 140px; }
+        .add-sa-form #new-sa-desc { flex: 2; min-width: 200px; }
+        .add-sa-form #btn-add-sa { flex-shrink: 0; }
+        .btn-small-capture { padding: 4px 10px; font-size: 10px; width: auto; font-weight: 600; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--tr-orange); cursor: pointer; transition:0.2s; display:flex; align-items:center; gap:5px; text-transform:uppercase;}
+        .btn-small-capture:hover { background: rgba(255, 128, 0, 0.1); border-color: var(--tr-orange); }
+        
+        .note-card { background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; margin-bottom: 10px; position: relative; }
+        .note-card:hover { border-color: var(--tr-orange); }
+        .note-content { font-size: 12px; line-height: 1.4; color: var(--text-primary); min-height: 36px; outline: none; }
+        .note-content[contenteditable]:focus { border-radius: 4px; box-shadow: 0 0 0 1px var(--tr-orange); }
+        .note-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+        .note-date { font-size: 10px; color: var(--text-secondary); }
+        .note-delete { background: transparent; border: none; color: var(--danger); cursor: pointer; font-size: 12px; padding: 2px 5px; opacity: 0.6; }
+        .note-delete:hover { opacity: 1; background: rgba(239, 68, 68, 0.1); border-radius: 4px; }
+        
+        .color-dropdown { position: relative; display: inline-block; }
+        .color-palette { display: none; position: absolute; top: 100%; left: 0; margin-top: 4px; z-index: 1000; background: var(--bg-card); border: 1px solid var(--border-color); padding: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); width: auto; grid-template-columns: repeat(4, 1fr); gap: 4px; border-radius: 6px; }
+        .color-swatch { width: 24px; height: 24px; border-radius: 4px; cursor: pointer; border: 1px solid var(--border-color); }
+        .color-swatch:hover { transform: scale(1.1); box-shadow: 0 0 0 2px var(--tr-orange); }
+    </style>
+</head>
+<body class="dark-mode">
+    <div id="sidebar">
+        <div id="sidebar-header">
+            <div class="tr-brand-area">
+                <div class="tr-logo-lockup">
+                    <svg class="tr-kinesis-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="12" r="7"/><circle cx="78" cy="22" r="7"/><circle cx="92" cy="50" r="7"/><circle cx="78" cy="78" r="7"/><circle cx="50" cy="88" r="7"/><circle cx="22" cy="78" r="7"/><circle cx="8" cy="50" r="7"/><circle cx="22" cy="22" r="7"/></svg>
+                    <div class="tr-wordmark">DailyPlan<br><span style="font-size:9px; font-weight:600; color:var(--text-secondary); letter-spacing:0.5px;">PRODUCT FOCUS</span>            </div>
+                </div>
+            </div>
+        </div>
+        <div id="new-version-banner" class="new-version-banner" style="display:none;">
+            <div class="new-version-text"><strong>Nova versão disponível!</strong> <span id="new-version-number"></span> Atualize a extensão.</div>
+            <div class="new-version-actions">
+                <button type="button" class="footer-link" id="btn-ver-instrucoes" style="margin-right:6px;">Ver instruções</button>
+                <button type="button" class="header-btn" id="btn-close-new-version" title="Fechar aviso" style="font-size:16px; line-height:1;">×</button>
+            </div>
+        </div>
+        <div id="sidebar-icons">
+            <button type="button" id="btn-notes" class="header-btn" title="Anotações Gerais"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></button>
+            <button type="button" id="btn-calendar" class="header-btn" title="Próximos Vencimentos"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></button>
+            <button type="button" id="btn-dashboard" class="header-btn" title="Dashboard do mês"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5"><path d="M3 3v18h18"/><path d="M7 16v-5M12 16V9M17 16v-2"/></svg></button>
+            <button type="button" id="btn-search" class="header-btn" title="Pesquisar PSAI/SS/SAI"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></button>
+            <button type="button" id="theme-toggle" class="header-btn" title="Configurações"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+        </div>
+        <div class="work-type-filter">
+                <button type="button" class="filter-chip active" data-filter="all">Todos</button>
+                <button type="button" class="filter-chip" data-filter="PSAI">PSAI</button>
+                <button type="button" class="filter-chip" data-filter="SS">SS</button>
+                <button type="button" class="filter-chip" data-filter="SAI">SAI</button>
+                <button type="button" class="filter-chip" data-filter="NE">NE</button>
+            </div>
+        <div id="sidebar-groups" class="sidebar-groups" style="padding:8px 10px; border-bottom:1px solid var(--border-color);">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+                <span style="font-size:11px; font-weight:600; color:var(--text-secondary); text-transform:uppercase;">Grupos</span>
+                <button type="button" class="footer-link" id="btn-new-group" title="Criar grupo">+ Novo</button>
+            </div>
+            <div id="groups-list" class="groups-list" style="max-height:120px; overflow-y:auto;"></div>
+        </div>
+        <div id="case-list" class="case-list"></div>
+        <div id="sidebar-footer">
+            <div class="footer-main">
+                <button type="button" id="add-btn" class="btn-with-icon"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;"><path d="M12 5v14M5 12h14"/></svg> Nova Análise</button>
+                <div class="footer-links">
+                    <button type="button" class="footer-link" id="btn-backup" title="Backup Total (download)"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:12px;height:12px;vertical-align:-2px;margin-right:4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>Backup</button>
+                    <button type="button" class="footer-link" id="btn-set-backup-folder" title="Escolher pasta do OneDrive para backup automático"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:12px;height:12px;vertical-align:-2px;margin-right:4px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Pasta backup</button>
+                    <button type="button" class="footer-link" id="btn-restore" title="Importar backup"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:12px;height:12px;vertical-align:-2px;margin-right:4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>Importar</button>
+                </div>
+                <p class="backup-auto-hint" style="margin:6px 0 0; font-size:10px; color:var(--text-secondary);">Com a pasta definida, todos os salvamentos geram backup automático nela. <span id="backup-folder-label" class="backup-folder-label"></span></p>
+                <input type="file" id="file-input" accept=".json,application/json" style="display:none">
+            </div>
+        </div>
+    </div>
+
+    <div id="main">
+        <div id="empty-state" style="margin: auto; padding: 24px; color: var(--text-secondary); text-align: center;">
+            <div class="empty-state-choice">
+                <p class="empty-state-title">O que você vai trabalhar?</p>
+                <div class="work-type-buttons">
+                    <button type="button" class="work-type-btn" data-type="all"><span class="wt-icon"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:24px;height:24px;"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M12 11h4M12 16h4M8 11h.01M8 16h.01"/></svg></span><span>Todos</span></button>
+                    <button type="button" class="work-type-btn" data-type="PSAI"><span class="wt-icon"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:24px;height:24px;"><path d="M4 17l6-6-6-6"/><path d="M12 19h8"/></svg></span><span>PSAI</span></button>
+                    <button type="button" class="work-type-btn" data-type="SS"><span class="wt-icon"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:24px;height:24px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></span><span>SS</span></button>
+                    <button type="button" class="work-type-btn" data-type="SAI"><span class="wt-icon"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:24px;height:24px;"><path d="M12 2v6l4 2 4 8H4l4-8 4-2V2z"/></svg></span><span>SAI</span></button>
+                    <button type="button" class="work-type-btn" data-type="NE"><span class="wt-icon"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:24px;height:24px;"><path d="M4 6h16M4 12h16M4 18h16"/></svg></span><span>NE</span></button>
+                </div>
+                <p class="empty-state-hint">Ou selecione uma análise na lista ao lado.</p>
+            </div>
+        </div>
+
+        <div id="group-view" class="group-view" style="display:none; flex:1; flex-direction:column; padding:24px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+                <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:0;">
+                    <h2 id="group-view-title" style="margin:0; font-size:16px; font-weight:700; color:var(--text-primary);"></h2>
+                    <button type="button" class="header-btn" id="btn-group-edit-name" title="Alterar nome do grupo" style="flex-shrink:0;"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                    <input type="text" id="group-view-name-edit" style="display:none; margin:0; font-size:16px; font-weight:700; flex:1; min-width:120px;" placeholder="Nome do grupo">
+                    <span id="group-view-name-edit-actions" style="display:none;">
+                        <button type="button" class="btn-secondary btn-action" id="btn-group-name-save" style="font-size:12px;">Salvar</button>
+                        <button type="button" class="btn-secondary btn-action" id="btn-group-name-cancel" style="font-size:12px;">Cancelar</button>
+                    </span>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <button type="button" class="btn-secondary btn-action" id="btn-group-add-cases" style="font-size:12px;">+ Adicionar análises</button>
+                    <button type="button" class="btn-secondary btn-action" id="btn-group-delete" style="font-size:12px; color:var(--danger); border-color:var(--danger);">Excluir grupo</button>
+                    <button type="button" class="btn-secondary btn-action" id="btn-group-view-back">← Voltar</button>
+                </div>
+            </div>
+            <p style="font-size:12px; color:var(--text-secondary); margin:0 0 12px;">Clique em uma análise para abrir. Use o ícone ✕ para remover do grupo.</p>
+            <div id="group-view-list" class="group-view-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+        </div>
+
+        <div id="content-area" class="" style="height:100%; flex-direction:column;">
+            <div class="tabs-header">
+                <button type="button" class="tab-btn active" data-tab="tab-general" id="btn-tab-general"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:12px;height:12px;vertical-align:-2px;margin-right:4px;"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>Visão Geral</button>
+                <button type="button" class="tab-btn" data-tab="tab-technical"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:12px;height:12px;vertical-align:-2px;margin-right:4px;"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>Detalhamento Técnico</button>
+                <div style="flex:1"></div>
+                <span id="save-status">SALVO</span>
+            </div>
+
+            <div class="scroll-container" id="scroll-container">
+                <div id="tab-general" class="tab-content active">
+                    <div class="card card-collapsible work-type-card">
+                        <div class="card-header-toggle" title="Clique para minimizar/expandir">
+                            <label style="margin:0;">Tipo de trabalho</label>
+                            <button type="button" class="header-btn card-toggle-btn" aria-label="Minimizar/Expandir" title="Minimizar/Expandir"><svg viewBox="0 0 24 24" class="icon-outline" style="width:16px;height:16px;"><path d="M6 9l6 6 6-6"/></svg></button>
+                        </div>
+                        <div class="card-body-toggle">
+                        <label>Tipo de trabalho</label>
+                        <select id="input-work-type"><option value="PSAI">PSAI</option><option value="SS">SS</option><option value="SAI">SAI</option><option value="NE">NE</option></select>
+                        </div>
+                    </div>
+                    <!-- PsaiPainel: linha de cabeçalho Cód. PSAI | Nível | Data (ref. imagem) -->
+                    <div id="psai-painel" class="panel-general active">
+                    <div class="card card-collapsible section-psai">
+                        <div class="card-header-toggle" title="Clique para minimizar/expandir">
+                            <h3><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;vertical-align:-2px;margin-right:6px;"><path d="M4 17l6-6-6-6"/><path d="M12 19h8"/></svg>PSAI</h3>
+                            <button type="button" class="header-btn card-toggle-btn" aria-label="Minimizar/Expandir" title="Minimizar/Expandir"><svg viewBox="0 0 24 24" class="icon-outline" style="width:16px;height:16px;"><path d="M6 9l6 6 6-6"/></svg></button>
+                        </div>
+                        <div class="card-body-toggle">
+                        <div id="psai-reuniao-duvida-wrap" class="psai-status-extra psai-reuniao-duvida-box" style="display:none; margin-bottom:16px; padding:12px; border:2px solid #dc2626; background:rgba(220,38,38,0.08); border-radius:8px;">
+                            <label class="ss-label" for="input-psai-reuniao-duvida" style="color:#b91c1c; font-weight:600;">Informe a dúvida para levar na reunião</label>
+                            <textarea id="input-psai-reuniao-duvida" placeholder="Descreva a dúvida..." rows="3" style="width:100%; margin-top:6px; padding:8px; font-size:12px; border:1px solid #dc2626; border-radius:4px; background:var(--bg-input); color:var(--text-primary);"></textarea>
+                        </div>
+                        <!-- Linha de cabeçalho: Cód. PSAI (apenas código, ex: 117543) + Abrir link | Nível da Alteração | Data -->
+                        <div class="psai-header-row">
+                            <div class="psai-cod-wrap">
+                                <div style="flex:1; min-width:0;"><label class="psai-label" for="input-psai-link">Cód. PSAI</label><div style="display:flex; gap:6px; align-items:center;"><input type="text" id="input-psai-link" placeholder="Ex: 117543" style="flex:1; min-width:0;"><button type="button" class="header-btn" id="btn-go" title="Abrir link (nova aba)"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg></button></div></div>
+                            </div>
+                            <div class="psai-nivel-wrap"><label class="psai-label" for="input-psai-nivel">Nível da Alteração</label><select id="input-psai-nivel"><option value="">—</option><option value="Pequena">Pequena</option><option value="Média">Média</option><option value="Grande">Grande</option></select></div>
+                            <div class="psai-data-wrap"><label class="psai-label" for="input-psai-data">Data</label><input type="date" id="input-psai-data"></div>
+                        </div>
+                        <div style="display:grid; grid-template-columns: 2fr 1fr; gap: 15px;">
+                            <div><label>Título</label><input type="text" id="input-title"></div>
+                            <div><label>Tipo</label><input type="text" id="input-type" placeholder="Ex: Melhoria"></div>
+                        </div>
+                        <label>Descrição</label><textarea id="input-psai-desc" style="min-height:60px;"></textarea>
+                        <label>Observações</label><textarea id="input-obs" style="min-height:40px; background:var(--bg-body);" placeholder="Anotações extras..."></textarea>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top:10px;">
+                            <div><label>Status</label>
+                                <select id="input-status">
+                                    <option value="Em definição">Em definição</option>
+                                    <option value="Fila">Fila</option>
+                                    <option value="Pausado">Pausado</option>
+                                    <option value="Aguardando Desenvolvimento">Aguardando Desenvolvimento</option>
+                                    <option value="Em revisão">Em revisão</option>
+                                    <option value="Analisada">Analisada</option>
+                                    <option value="Retornada">Retornada</option>
+                                    <option value="Stand by">Stand by</option>
+                                    <option value="Levar na Reunião de Dúvidas">Levar na Reunião de Dúvidas</option>
+                                    <option value="Aguardando resposta do Especialista/Coordenador">Aguardando Especialista/Coord.</option>
+                                    <option value="Aguard. Consultoria">Aguard. Consultoria</option>
+                                    <option value="Aguardando Unidade">Aguardando Unidade</option>
+                                    <option value="Concluído sem desenvolvimento/Reprovada">Concluído sem dev/Reprovada</option>
+                                    <option value="Concluído">Concluído</option>
+                                    <option value="Prescrita">Prescrita</option>
+                                </select>
+                            </div>
+                            <div><label>Prioridade</label><select id="input-priority"><option value="null">-</option><option value="Alta">Alta</option><option value="Media">Média</option><option value="Baixa">Baixa</option></select></div>
+                            <div><label>Prazo</label><input type="date" id="input-deadline"></div>
+                        </div>
+                        <div id="psai-pausado-wrap" style="display:none; margin-top:10px;">
+                            <label class="psai-label" for="input-psai-pausado-por">Quem mandou pausar?</label>
+                            <input type="text" id="input-psai-pausado-por" placeholder="Nome de quem solicitou pausar" style="width:100%; max-width:280px; padding:8px 10px; font-size:12px; border:1px solid var(--border-color); border-radius:4px; background:var(--bg-input); color:var(--text-primary);">
+                        </div>
+                        </div>
+                    </div>
+                    </div>
+                    <!-- SSPainel: layout idêntico à referência (5 linhas + Detalhamento + Rodapé) -->
+                    <div id="ss-painel" class="panel-general">
+                    <div class="card card-collapsible section-ss">
+                        <div class="card-header-toggle" title="Clique para minimizar/expandir">
+                            <div class="ss-header-row" style="margin:0; border:none; padding:0; flex:1;">
+                                <div class="ss-header-left">
+                                    <h3 style="margin:0;"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;vertical-align:-2px;margin-right:6px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>SS</h3>
+                                    <span id="ss-tramites-badge" class="ss-tramites-badge" style="display:none;">0 Trâmites</span>
+                                </div>
+                                <div class="ss-header-right ss-float-btn">
+                                    <button type="button" class="btn-ler-ss-aba" id="btn-ler-ss-aba" title="Ler dados da aba do sistema legado (SS) aberta"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Ler da Aba Aberta</button>
+                                </div>
+                            </div>
+                            <button type="button" class="header-btn card-toggle-btn" aria-label="Minimizar/Expandir" title="Minimizar/Expandir"><svg viewBox="0 0 24 24" class="icon-outline" style="width:16px;height:16px;"><path d="M6 9l6 6 6-6"/></svg></button>
+                        </div>
+                        <div class="card-body-toggle">
+                        <div id="ss-visao" class="ss-section">
+                            <!-- Linha 1: Cód. SS (com ícone) | Status | Data | Nível de Complexidade -->
+                            <div class="ss-grid-row ss-grid-row-1">
+                                <div><label class="ss-label" for="input-ss-numero">Cód. SS</label><div class="ss-cod-wrap"><input type="text" id="input-ss-numero" placeholder="Ex: 98776"><span><button type="button" class="header-btn" id="btn-open-ss" title="Abrir SS"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg></button></span></div></div>
+                                <div><label class="ss-label" for="input-ss-status">Status</label><select id="input-ss-status"><option value="Em análise">Em análise</option><option value="Aguardando retorno do DEV">Aguardando retorno do DEV</option><option value="Reunião de dúvidas">Reunião de dúvidas</option><option value="Concluído">Concluído</option></select></div>
+                                <div><label class="ss-label" for="input-ss-data">Data</label><input type="date" id="input-ss-data"></div>
+                                <div><label class="ss-label" for="input-ss-complexidade">Nível de Complexidade</label><select id="input-ss-complexidade"><option value="Alta">Alta</option><option value="Média">Média</option><option value="Baixa">Baixa</option></select></div>
+                            </div>
+                            <!-- Subtópico (antes de Assunto) -->
+                            <div class="ss-grid-row">
+                                <div style="grid-column:1/-1;"><label class="ss-label" for="input-ss-subtopico">Subtópico</label><input type="text" id="input-ss-subtopico" placeholder="Ex: Serviços/Filiais"></div>
+                            </div>
+                            <!-- Linha 2: Assunto (largura total) -->
+                            <div class="ss-grid-row">
+                                <div style="grid-column:1/-1;"><label class="ss-label" for="input-ss-assunto">Assunto</label><input type="text" id="input-ss-assunto" placeholder="Assunto da SS"></div>
+                            </div>
+                            <!-- Linha 3: Observações / Problema (textarea) -->
+                            <div class="ss-grid-row">
+                                <div style="grid-column:1/-1;"><label class="ss-label" for="input-ss-problema">Observações / Problema (Situation/Problema)</label><textarea id="input-ss-problema" class="ss-textarea" placeholder="Descreva de forma detalhada..."></textarea></div>
+                            </div>
+                            <!-- Linha 4: Passos para Reproduzir (textarea) -->
+                            <div class="ss-grid-row">
+                                <div style="grid-column:1/-1;"><label class="ss-label" for="input-ss-passos">Passos para Reproduzir</label><textarea id="input-ss-passos" class="ss-textarea" placeholder="Passos para reproduzir a situação"></textarea></div>
+                            </div>
+                            <!-- Linha 5: Checkbox — logo abaixo de "Passos para Reproduzir", alinhado à esquerda -->
+                            <div class="ss-banco-cliente-row">
+                                <input type="checkbox" id="input-ss-banco-cliente">
+                                <label for="input-ss-banco-cliente" class="ss-banco-cliente-label">Situação ocorre apenas no Banco de Dados do Cliente</label>
+                            </div>
+                            <div id="ss-banco-cliente-conteudo-wrap" style="display:none; margin-top:10px;">
+                                <label class="ss-label" for="input-ss-banco-cliente-conteudo" id="ss-banco-cliente-conteudo-label">Conteúdo (Banco de Dados do Cliente)</label>
+                                <textarea id="input-ss-banco-cliente-conteudo" class="ss-textarea" placeholder="Preenchido automaticamente ao importar HTML da SS (conteúdo do campo colspan=3)" rows="4"></textarea>
+                            </div>
+                            <!-- Secção Detalhamento Técnico (SS) -->
+                            <div class="ss-grid-row">
+                                <div style="grid-column:1/-1;"><label class="ss-label" for="input-ss-detalhe-tecnico">Detalhamento técnico</label><textarea id="input-ss-detalhe-tecnico" class="ss-textarea" placeholder="Análise / detalhe técnico (preenchido automaticamente ao importar HTML da SS)"></textarea></div>
+                            </div>
+                        </div>
+                        </div>
+                    </div>
+                    </div>
+                    <!-- Contexto & Resumo: um único campo (trâmites para SS) + SSCs/SAs -->
+                    <div id="contexto-resumo-wrapper" class="card card-collapsible" style="display:none;">
+                        <div class="card-header-toggle" id="contexto-resumo-card-header" title="Clique para minimizar/expandir">
+                            <h3 id="contexto-resumo-card-title" style="margin:0; display:flex; align-items:center; gap:8px;">🤖 Contexto & Resumo</h3>
+                            <button type="button" class="header-btn card-toggle-btn" aria-label="Minimizar/Expandir" title="Minimizar/Expandir"><svg viewBox="0 0 24 24" class="icon-outline" style="width:16px;height:16px;"><path d="M6 9l6 6 6-6"/></svg></button>
+                        </div>
+                        <div id="contexto-resumo-card-body" class="card-body-toggle">
+                        <div id="contexto-resumo-field-wrap">
+                            <div class="summary-block" style="margin-bottom:8px;">
+                                <div class="summary-header normal">📋 Contexto & Resumo — Trâmites</div>
+                                <div id="tramites-brief-summary" class="summary-content" style="padding:10px; font-size:12px; color:var(--text-secondary); border-bottom:1px solid var(--border-color); margin-bottom:10px; display:none;"></div>
+                                <div id="tramites-list" class="summary-content" style="padding:10px;"></div>
+                            </div>
+                        </div>
+                        <div id="summary-area"></div>
+                        <div class="add-sa-form"><label class="add-sa-label" id="contexto-resumo-label">Adicionar SA</label><div class="add-sa-row"><input type="text" id="new-sa-code" placeholder="Código"><input type="text" id="new-sa-url" placeholder="URL (opcional)"><input type="text" id="new-sa-desc" placeholder="Descrição"><button type="button" class="btn-secondary btn-action" id="btn-add-sa">+ Adicionar</button></div></div>
+                        <div class="summary-footer"><span id="stats-count">0</span> <span id="contexto-resumo-count-label">SAs</span> <button type="button" class="btn-secondary btn-action" id="btn-copy-contexto" title="Copiar conteúdo (Contexto & Resumo)"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg> Copiar conteúdo</button></div>
+                        </div>
+                    </div>
+                    <!-- SaiPainel: 4 linhas lógicas (ref. layout) -->
+                    <div id="sai-painel" class="panel-general">
+                    <div class="card card-collapsible section-sai">
+                        <div class="card-header-toggle" title="Clique para minimizar/expandir">
+                            <h3><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;vertical-align:-2px;margin-right:6px;"><path d="M12 2v6l4 2 4 8H4l4-8 4-2V2z"/></svg>SAI</h3>
+                            <button type="button" class="header-btn card-toggle-btn" aria-label="Minimizar/Expandir" title="Minimizar/Expandir"><svg viewBox="0 0 24 24" class="icon-outline" style="width:16px;height:16px;"><path d="M6 9l6 6 6-6"/></svg></button>
+                        </div>
+                        <div class="card-body-toggle">
+                        <!-- Linha 1: Cód. SAI | Complexidade/Tamanho | Pontuação | Data -->
+                        <div class="sai-grid-row sai-grid-row-1">
+                            <div><label class="sai-label" for="input-sai-generated">Cód. SAI</label><div class="sai-cod-wrap"><input type="text" id="input-sai-generated" placeholder="Cód SAI..."><span class="btn-open-sai-wrap"><button type="button" class="header-btn" id="btn-open-sai" title="Abrir SAI"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg></button></span></div></div>
+                            <div><label class="sai-label" for="input-sai-level">Complexidade/Tamanho</label><select id="input-sai-level"><option value="">—</option><option value="Baixa">Baixa</option><option value="Média">Média</option><option value="Alta">Alta</option><option value="Extra alta">Extra alta</option></select></div>
+                            <div><label class="sai-label" for="input-sai-score">Pontuação</label><input type="number" id="input-sai-score" min="0" max="10" step="0.5" placeholder="Ex: 8"></div>
+                            <div><label class="sai-label" for="input-sai-data">Data</label><input type="date" id="input-sai-data"></div>
+                        </div>
+                        <!-- Linha 2: Status | Prioridade | Prazo -->
+                        <div class="sai-grid-row sai-grid-row-2">
+                            <div><label class="sai-label" for="input-sai-status">Status</label><select id="input-sai-status"><option value="">—</option><option value="Aguardando reunião">Aguardando reunião</option><option value="Gravado temporário">Gravado temporário</option><option value="Em análise do Coordenador">Em análise do Coordenador</option><option value="Em reanálise">Em reanálise</option><option value="Stand by">Stand by</option><option value="Levar na reunião de dúvidas">Levar na reunião de dúvidas</option><option value="Em análise">Em análise</option><option value="Liberada">Liberada</option><option value="Em homologação">Em homologação</option><option value="Concluída">Concluída</option><option value="Reprovada">Reprovada</option></select></div>
+                            <div><label class="sai-label" for="input-sai-priority">Prioridade</label><select id="input-sai-priority"><option value="">—</option><option value="Alta">Alta</option><option value="Media">Média</option><option value="Baixa">Baixa</option></select></div>
+                            <div><label class="sai-label" for="input-sai-prazo">Prazo</label><input type="date" id="input-sai-prazo"></div>
+                        </div>
+                        <!-- Linha 3: Assunto (100% largura) -->
+                        <div class="sai-grid-row sai-grid-row-3">
+                            <div style="grid-column: 1 / -1;"><label class="sai-label" for="input-sai-assunto">Assunto</label><input type="text" id="input-sai-assunto" placeholder="Assunto da SS"></div>
+                        </div>
+                        <!-- Linha 4: Observações (textarea altura expandida) -->
+                        <div class="sai-grid-row sai-grid-row-4">
+                            <div style="grid-column: 1 / -1;"><label class="sai-label" for="input-sai-obs">Observações</label><textarea id="input-sai-obs" class="sai-obs-textarea" placeholder="Descreva de forma detalhada..."></textarea></div>
+                        </div>
+                        </div>
+                    </div>
+                    </div>
+                    <!-- NEPanel: mínimo (Título, Tipo, Status NE) -->
+                    <div id="ne-painel" class="panel-general">
+                    <div class="card card-collapsible section-psai">
+                        <div class="card-header-toggle" title="Clique para minimizar/expandir">
+                            <h3><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;vertical-align:-2px;"><path d="M4 6h16M4 12h16M4 18h16"/></svg>NE</h3>
+                            <button type="button" class="header-btn card-toggle-btn" aria-label="Minimizar/Expandir"><svg viewBox="0 0 24 24" class="icon-outline" style="width:16px;height:16px;"><path d="M6 9l6 6 6-6"/></svg></button>
+                        </div>
+                        <div class="card-body-toggle">
+                        <div style="display:grid; grid-template-columns: 2fr 1fr; gap: 15px;">
+                            <div><label>Título</label><input type="text" id="input-ne-title" placeholder="Título"></div>
+                            <div><label>Tipo</label><input type="text" id="input-ne-type" placeholder="Ex: Melhoria"></div>
+                        </div>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top:10px;">
+                            <div><label>Status</label><select id="input-ne-status"><option value="">—</option><option value="Aguardando reunião">Aguardando reunião</option><option value="Em análise interna">Em análise interna</option><option value="Reprovada">Reprovada</option><option value="Concluído">Concluído</option></select></div>
+                            <div><label>Prioridade</label><select id="input-ne-priority"><option value="null">-</option><option value="Alta">Alta</option><option value="Media">Média</option><option value="Baixa">Baixa</option></select></div>
+                            <div><label>Prazo</label><input type="date" id="input-ne-deadline"></div>
+                        </div>
+                        </div>
+                    </div>
+                    </div>
+                    <div class="footer-actions"><button type="button" class="btn-secondary btn-action" id="btn-export-single-gen">Exportar Este</button><div style="flex:1"></div><button type="button" class="btn-danger btn-action" id="btn-delete-gen" title="Excluir análise"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:16px;height:16px;"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button><button type="button" class="btn-primary btn-action" id="btn-save-gen">Salvar Agora</button></div>
+                </div>
+
+                <div id="tab-technical" class="tab-content">
+                    <!-- 1. Empresa de Teste -->
+                    <div class="card card-collapsible section-ss" style="margin-bottom:16px;">
+                        <div class="card-header-toggle" title="Clique para minimizar/expandir">
+                            <h4 class="ss-detalhe-title" style="padding-top:0; border-top:none; margin-top:0;">Empresa de Teste</h4>
+                            <button type="button" class="header-btn card-toggle-btn" aria-label="Minimizar/Expandir" title="Minimizar/Expandir"><svg viewBox="0 0 24 24" class="icon-outline" style="width:16px;height:16px;"><path d="M6 9l6 6 6-6"/></svg></button>
+                        </div>
+                        <div class="card-body-toggle">
+                        <div id="psai-empresa-dominio-wrap" style="display:none;">
+                            <label class="ss-label" style="display:block; margin-bottom:8px;">FOI TESTADO EM: <span style="font-weight:400; color:var(--text-secondary);">(PODE MARCAR OS DOIS)</span></label>
+                            <input type="hidden" id="input-psai-dominio" value="">
+                            <div style="display:flex; flex-direction:column; gap:10px;">
+                                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                                    <button type="button" class="btn-secondary btn-action psai-dominio-btn" data-dominio="Local" style="min-width:120px;">Domínio Local</button>
+                                    <input type="text" id="input-psai-dominio-local-empresa" placeholder="Ex: 9999 - Empresa Padrão" style="flex:1; min-width:180px;">
+                                    <label class="dominio-repro-label" style="display:flex; align-items:center; gap:6px; font-size:11px; white-space:nowrap; cursor:pointer;">
+                                        <input type="checkbox" id="input-psai-dominio-local-repro" style="width:16px; height:16px; accent-color:var(--tr-orange);">
+                                        SITUAÇÃO REPRODUZIDA NO BANCO DE TESTE
+                                    </label>
+                                </div>
+                                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                                    <button type="button" class="btn-secondary btn-action psai-dominio-btn" data-dominio="Web" style="min-width:120px;">Domínio Web</button>
+                                    <input type="text" id="input-psai-dominio-web-empresa" placeholder="Ex: 9999 - Empresa Padrão" style="flex:1; min-width:180px;">
+                                    <label class="dominio-repro-label" style="display:flex; align-items:center; gap:6px; font-size:11px; white-space:nowrap; cursor:pointer;">
+                                        <input type="checkbox" id="input-psai-dominio-web-repro" style="width:16px; height:16px; accent-color:var(--tr-orange);">
+                                        SITUAÇÃO REPRODUZIDA NO BANCO DE TESTE
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        </div>
+                    </div>
+                    <div id="psai-esocial-card" class="card card-collapsible section-ss" style="display:none; margin-bottom:16px;">
+                        <div class="card-header-toggle" title="Clique para minimizar/expandir">
+                            <h4 class="ss-detalhe-title" style="padding-top:0; border-top:none; margin-top:0;">eSocial e certificado</h4>
+                            <button type="button" class="header-btn card-toggle-btn" aria-label="Minimizar/Expandir" title="Minimizar/Expandir"><svg viewBox="0 0 24 24" class="icon-outline" style="width:16px;height:16px;"><path d="M6 9l6 6 6-6"/></svg></button>
+                        </div>
+                        <div class="card-body-toggle">
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                            <input type="checkbox" id="input-psai-esocial" style="width:18px; height:18px; accent-color:var(--tr-orange);">
+                            <label for="input-psai-esocial" style="margin:0; font-size:12px; cursor:pointer;">Empresa enviada para eSocial?</label>
+                        </div>
+                        <div style="margin-bottom:10px;">
+                            <label class="ss-label" for="input-psai-certificado">Teste realizado com qual certificado?</label>
+                            <input type="text" id="input-psai-certificado" placeholder="Ex: Certificado Digital A1" style="width:100%; padding:8px 10px; font-size:12px; border:1px solid var(--border-color); border-radius:4px; background:var(--bg-input); color:var(--text-primary);">
+                        </div>
+                        <div>
+                            <label class="ss-label" for="input-psai-senha-cert">Senha do certificado</label>
+                            <input type="password" id="input-psai-senha-cert" placeholder="Senha" style="width:100%; max-width:200px; padding:8px 10px; font-size:12px; border:1px solid var(--border-color); border-radius:4px; background:var(--bg-input); color:var(--text-primary);">
+                        </div>
+                        </div>
+                    </div>
+                    <!-- 2. Testes Realizados -->
+                    <div class="card card-collapsible section-ss" style="margin-bottom:16px;">
+                        <div class="card-header-toggle" title="Clique para minimizar/expandir">
+                            <h4 class="ss-detalhe-title" style="padding-top:0; border-top:none; margin-top:0;">Testes Realizados</h4>
+                            <button type="button" class="header-btn card-toggle-btn" aria-label="Minimizar/Expandir" title="Minimizar/Expandir"><svg viewBox="0 0 24 24" class="icon-outline" style="width:16px;height:16px;"><path d="M6 9l6 6 6-6"/></svg></button>
+                        </div>
+                        <div class="card-body-toggle">
+                        <div class="rich-editor-container">
+                            <div class="toolbar"><button class="btn-format" data-cmd="bold" title="Negrito"><b>B</b></button><button class="btn-format" data-cmd="italic" title="Itálico"><i>I</i></button><button class="btn-format" data-cmd="underline"><u>U</u></button><div class="separator"></div><div class="color-dropdown"><button class="btn-toggle-palette" title="Cor Texto"><b style="color:#ef4444">A</b></button><div class="color-palette" data-target="foreColor"></div></div><div class="color-dropdown"><button class="btn-toggle-palette" title="Cor Fundo"><span style="background:#fcd34d; color:#333; padding:0 3px;">🖌</span></button><div class="color-palette" data-target="hiliteColor"></div></div><div class="separator"></div><button class="btn-format" data-cmd="insertUnorderedList" title="Lista">•</button></div>
+                            <div id="input-tests" class="rich-input" contenteditable="true" placeholder="Descreva os testes..."></div>
+                        </div>
+                        </div>
+                    </div>
+                    <!-- 3. SS apenas: Próximo Passo e Integração / Apoio (visível só quando tipo = SS) -->
+                    <div id="tab-technical-ss-only" style="display:none;">
+                    <div class="card card-collapsible section-ss" style="margin-bottom:16px;">
+                        <div class="card-header-toggle" title="Clique para minimizar/expandir">
+                            <h4 class="ss-detalhe-title" style="padding-top:0; border-top:none; margin-top:0;">Próximo passo e Apoio</h4>
+                            <button type="button" class="header-btn card-toggle-btn" aria-label="Minimizar/Expandir" title="Minimizar/Expandir"><svg viewBox="0 0 24 24" class="icon-outline" style="width:16px;height:16px;"><path d="M6 9l6 6 6-6"/></svg></button>
+                        </div>
+                        <div class="card-body-toggle">
+                        <div class="ss-grid-row">
+                            <div><label class="ss-label" for="input-ss-proximo-passo">Próximo Passo</label><select id="input-ss-proximo-passo"><option value="">—</option><option value="Cobrar suporte">Cobrar suporte</option><option value="Cadastro de SA">Cadastro de SA</option><option value="Cadastro de NE">Cadastro de NE</option><option value="Cadastro de SA/NE">Cadastro de SA/NE</option><option value="Acompanhar Solução DEV">Acompanhar Solução DEV</option><option value="Acompanhar DEV">Acompanhar DEV</option><option value="Validar com Cliente">Validar com Cliente</option><option value="Aguardar retorno">Aguardar retorno</option><option value="Outro">Outro</option></select></div>
+                        </div>
+                        <div id="ss-sa-ne-codigo-wrap" style="display:none; margin-top:10px;">
+                            <label class="ss-label" for="input-ss-sa-ne-codigo" id="ss-sa-ne-codigo-label">Código da SA/NE criada</label>
+                            <input type="text" id="input-ss-sa-ne-codigo" placeholder="Ex: 420056" style="width:100%; max-width:200px;">
+                        </div>
+                        <div class="ss-grid-row" style="margin-top:10px;">
+                            <div style="grid-column:1/-1;"><label class="ss-label" for="input-ss-apoio">Integração / Apoio</label><input type="text" id="input-ss-apoio" placeholder="Ex: Portal do Cliente, Equipe Folha, outro módulo ou equipe"></div>
+                        </div>
+                        </div>
+                    </div>
+                    </div>
+                    
+                    <div class="card card-collapsible card-section card-research">
+                        <div class="card-header-toggle" title="Clique para minimizar/expandir">
+                            <h3><span class="card-title-text"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;vertical-align:-2px;"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M8 7h8M8 11h8"/></svg>Pesquisas & Referências</span></h3>
+                            <button type="button" class="header-btn card-toggle-btn" aria-label="Minimizar/Expandir" title="Minimizar/Expandir"><svg viewBox="0 0 24 24" class="icon-outline" style="width:16px;height:16px;"><path d="M6 9l6 6 6-6"/></svg></button>
+                        </div>
+                        <div class="card-body-toggle">
+                        <div id="research-wrapper">
+                            <div class="research-topic"><div class="research-topic-title">SAI's liberadas <button type="button" class="header-btn btn-add-research-topic" data-topic="sai" style="width:24px; height:24px;"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:12px;height:12px;"><path d="M12 5v14M5 12h14"/></svg></button></div><div id="research-container-sai" class="research-container"></div></div>
+                            <div class="research-topic"><div class="research-topic-title">NE <button class="header-btn btn-add-research-topic" data-topic="ne" style="width:24px; height:24px;"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:12px;height:12px;"><path d="M12 5v14M5 12h14"/></svg></button></div><div id="research-container-ne" class="research-container"></div></div>
+                            <div class="research-topic"><div class="research-topic-title">Outros links <button class="header-btn btn-add-research-topic" data-topic="outros" style="width:24px; height:24px;"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:12px;height:12px;"><path d="M12 5v14M5 12h14"/></svg></button></div><div id="research-container-outros" class="research-container"></div></div>
+                        </div>
+                        </div></div>
+
+                    <div class="card card-collapsible card-section">
+                        <div class="card-header-toggle" title="Clique para minimizar/expandir">
+                            <h3><span class="card-title-text"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;vertical-align:-2px;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Avaliado com:</span><button type="button" class="header-btn" id="btn-add-manager" style="width:24px; height:24px;" title="Adicionar"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:12px;height:12px;"><path d="M12 5v14M5 12h14"/></svg></button></h3>
+                            <button type="button" class="header-btn card-toggle-btn" aria-label="Minimizar/Expandir" title="Minimizar/Expandir"><svg viewBox="0 0 24 24" class="icon-outline" style="width:16px;height:16px;"><path d="M6 9l6 6 6-6"/></svg></button>
+                        </div>
+                        <div class="card-body-toggle">
+                        <div id="manager-reviews-container"></div>
+                        </div>
+                    </div>
+
+                    <label>Solução Final</label>
+                    <div class="rich-editor-container">
+                        <div class="toolbar"><button class="btn-format" data-cmd="bold" title="Negrito"><b>B</b></button><button class="btn-format" data-cmd="italic" title="Itálico"><i>I</i></button><button class="btn-format" data-cmd="underline"><u>U</u></button><div class="separator"></div><div class="color-dropdown"><button class="btn-toggle-palette" title="Cor Texto"><b style="color:#ef4444">A</b></button><div class="color-palette" data-target="foreColor"></div></div><div class="color-dropdown"><button class="btn-toggle-palette" title="Cor Fundo"><span style="background:#fcd34d; color:#333; padding:0 3px;">🖌</span></button><div class="color-palette" data-target="hiliteColor"></div></div><div class="separator"></div><button class="btn-format" data-cmd="insertUnorderedList" title="Lista">•</button></div>
+                        <div id="input-solution" class="rich-input" contenteditable="true" placeholder="Descreva a solução final..."></div>
+                    </div>
+                    
+                    <div class="footer-actions"><button class="btn-secondary btn-action" id="btn-export-single-tech">Exportar Este</button><div style="flex:1"></div><button class="btn-danger btn-action" id="btn-delete-tech" title="Excluir"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:16px;height:16px;"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button><button class="btn-secondary btn-action" id="btn-copy-tech"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg> Copiar Conteúdo</button><button class="btn-primary btn-action" id="btn-save-tech">Salvar Agora</button></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-dashboard" class="modal"><div class="modal-content" style="max-width:520px; width:90%;"><div class="modal-header"><strong><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;vertical-align:-2px;margin-right:6px;"><path d="M3 3v18h18"/><path d="M7 16v-5M12 16V9M17 16v-2"/></svg>Visão do mês</strong><button class="header-btn" id="close-dashboard"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg></button></div><div class="modal-body" style="background:var(--bg-body);">
+                        <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap;">
+                            <label style="margin:0;">Mês/ano:</label>
+                            <input type="month" id="dashboard-month" style="width:140px;">
+                            <button type="button" class="btn-secondary btn-action" id="dashboard-refresh">Atualizar</button>
+                        </div>
+                        <div id="dashboard-stats" class="dashboard-stats"></div>
+                        <div id="dashboard-charts" class="dashboard-charts"></div>
+                        <div style="margin-top:16px;"><strong style="font-size:11px; text-transform:uppercase; color:var(--text-secondary);">Análises no período (por data SAI)</strong></div>
+                        <div id="dashboard-list" class="dashboard-list" style="max-height:40vh; overflow-y:auto;"></div>
+                    </div></div></div>
+    <div id="modal-calendar" class="modal"><div class="modal-content"><div class="modal-header"><strong><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;vertical-align:-2px;margin-right:6px;"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Próximos Vencimentos</strong><button class="header-btn" id="close-calendar"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg></button></div><div class="modal-body" id="calendar-list-area"></div></div></div>
+    <div id="modal-notes" class="modal"><div class="modal-content" style="height: 500px;"><div class="modal-header"><strong><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;vertical-align:-2px;margin-right:6px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>Anotações Gerais</strong><button class="header-btn" id="close-notes"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg></button></div><div class="modal-body" id="notes-list-area" style="background:var(--bg-body);"></div><div style="padding:15px; border-top:1px solid var(--border-color); background:var(--bg-card);"><label style="margin-bottom:6px; display:block; font-size:11px; color:var(--text-secondary);">Nova nota (editável com formatação)</label><div class="rich-editor-container" style="margin-bottom:10px;"><div class="toolbar"><button class="btn-format" data-cmd="bold" title="Negrito"><b>B</b></button><button class="btn-format" data-cmd="italic" title="Itálico"><i>I</i></button><button class="btn-format" data-cmd="underline"><u>U</u></button><button class="btn-format" data-cmd="insertUnorderedList" title="Lista">•</button></div><div id="new-note-input" class="rich-input" contenteditable="true" placeholder="Nova nota..." style="min-height:60px;"></div></div><button id="btn-add-note" class="btn-primary btn-action" style="padding:10px 20px;">+ Adicionar</button></div></div></div>
+
+    <div id="modal-search" class="modal"><div class="modal-content" style="max-width:520px; width:95%;"><div class="modal-header"><strong><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;vertical-align:-2px;margin-right:6px;"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>Pesquisar PSAI/SS/SAI</strong><button class="header-btn" id="close-search"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg></button></div><div class="modal-body" style="background:var(--bg-body);"><input type="text" id="search-query" class="sync-input" placeholder="Digite número, título ou descrição..." style="margin-bottom:10px;"><div class="search-filters-row" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:12px;"><div><label style="display:block; font-size:10px; color:var(--text-secondary); margin-bottom:4px;">Data</label><input type="date" id="search-filter-date" class="sync-input" style="margin:0;"></div><div><label style="display:block; font-size:10px; color:var(--text-secondary); margin-bottom:4px;">Status</label><select id="search-filter-status" class="sync-input" style="margin:0; padding:6px 8px;"><option value="">Qualquer</option><option value="Em definição">Em definição</option><option value="Fila">Fila</option><option value="Pausado">Pausado</option><option value="Aguardando Desenvolvimento">Aguardando Desenvolvimento</option><option value="Em revisão">Em revisão</option><option value="Analisada">Analisada</option><option value="Retornada">Retornada</option><option value="Stand by">Stand by</option><option value="Levar na Reunião de Dúvidas">Levar na Reunião de Dúvidas</option><option value="Aguardando resposta do Especialista/Coordenador">Aguardando Especialista/Coord.</option><option value="Aguard. Consultoria">Aguard. Consultoria</option><option value="Aguardando Unidade">Aguardando Unidade</option><option value="Concluído sem desenvolvimento/Reprovada">Concluído sem dev/Reprovada</option><option value="Concluído">Concluído</option><option value="Em análise">Em análise</option><option value="Aguardando retorno do DEV">Aguardando retorno do DEV</option><option value="Reunião de dúvidas">Reunião de dúvidas</option><option value="Aguardando reunião">Aguardando reunião</option><option value="Gravado temporário">Gravado temporário</option><option value="Em análise do Coordenador">Em análise do Coordenador</option><option value="Em reanálise">Em reanálise</option><option value="Levar na reunião de dúvidas">Levar na reunião de dúvidas</option><option value="Liberada">Liberada</option><option value="Em homologação">Em homologação</option><option value="Concluída">Concluída</option><option value="Reprovada">Reprovada</option><option value="Em análise interna">Em análise interna</option><option value="Prescrita">Prescrita</option></select></div><div><label style="display:block; font-size:10px; color:var(--text-secondary); margin-bottom:4px;">Prioridade</label><select id="search-filter-priority" class="sync-input" style="margin:0; padding:6px 8px;"><option value="">Qualquer</option><option value="Alta">Alta</option><option value="Media">Média</option><option value="Baixa">Baixa</option><option value="null">—</option></select></div></div><div id="search-results" class="search-results-list"></div></div></div></div>
+
+    <div id="modal-ler-ss" class="modal"><div class="modal-content" style="max-width:560px; width:95%;"><div class="modal-header"><strong><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;vertical-align:-2px;margin-right:6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>Ler SS</strong><button class="header-btn" id="close-ler-ss"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg></button></div><div class="modal-body" style="background:var(--bg-body);"><p class="section-hint">Cole o HTML da página da SS abaixo ou use o botão para enviar um arquivo .html.</p><div style="display:flex; gap:8px; margin-bottom:10px;"><button type="button" class="btn-secondary btn-action" id="btn-ss-upload-html"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><path d="M12 11v8"/><path d="M9 14h6"/></svg> Enviar arquivo HTML</button><input type="file" id="file-ss-html" accept=".html,.htm" style="display:none"></div><textarea id="ss-html-paste" class="ss-parse-textarea" placeholder="Cole aqui o código HTML da página da SS..."></textarea><div style="margin-top:12px;"><button type="button" class="btn-primary btn-action" id="btn-ss-parse">Processar e preencher</button></div></div></div></div>
+
+    <div id="modal-settings" class="modal">
+        <div class="modal-content" style="max-width:360px;">
+            <div class="modal-header"><strong>Configurações</strong><button class="header-btn" id="close-settings"><svg viewBox="0 0 24 24" class="icon-outline" style="width:14px;height:14px;"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg></button></div>
+            <div class="modal-body">
+                <div style="margin-bottom:16px;">
+                    <label style="display:block; margin-bottom:6px; font-size:11px; text-transform:uppercase; color:var(--text-secondary);">Usuário (gravar no backup)</label>
+                    <input type="text" id="settings-backup-user" placeholder="Seu nome para identificar o backup" style="width:100%; padding:8px 10px; font-size:12px; border:1px solid var(--border-color); border-radius:4px; background:var(--bg-input); color:var(--text-primary);">
+                </div>
+                <div style="margin-bottom:16px;">
+                    <div style="display:flex; gap:8px;">
+                        <button type="button" class="btn-secondary btn-action" id="settings-theme-light" data-theme="light" style="flex:1;">Claro</button>
+                        <button type="button" class="btn-secondary btn-action" id="settings-theme-dark" data-theme="dark" style="flex:1;">Escuro</button>
+                    </div>
+                </div>
+                <div style="padding-top:12px; border-top:1px solid var(--border-color); margin-bottom:16px;">
+                    <label style="display:block; margin-bottom:6px; font-size:11px; text-transform:uppercase; color:var(--text-secondary);">Lembrete – copiar para anotações</label>
+                    <p class="section-hint" style="margin-bottom:8px;">Aviso para copiar as informações e colocar nas anotações da PSAI, SS e SAI.</p>
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                        <input type="checkbox" id="reminder-enabled" style="width:18px; height:18px; accent-color:var(--tr-orange);">
+                        <label for="reminder-enabled" style="margin:0; font-size:12px; cursor:pointer;">Ativar lembrete</label>
+                    </div>
+                    <label for="reminder-times" style="font-size:11px; color:var(--text-secondary);">Horários (ex: 09:00, 14:00)</label>
+                    <input type="text" id="reminder-times" placeholder="09:00, 14:00" style="width:100%; padding:8px 10px; margin-top:4px; font-size:12px; border:1px solid var(--border-color); border-radius:4px; background:var(--bg-input); color:var(--text-primary);">
+                    <button type="button" class="btn-primary btn-action" id="btn-save-reminder" style="margin-top:10px; width:100%;">Salvar lembrete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="modal-instrucoes-atualizar" class="modal">
+        <div class="modal-content" style="max-width:520px;">
+            <div class="modal-header"><strong>Como atualizar a extensão DailyPlan</strong><button class="header-btn" id="close-instrucoes-atualizar"><svg viewBox="0 0 24 24" class="icon-outline" style="width:14px;height:14px;"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg></button></div>
+            <div class="modal-body" id="instrucoes-atualizar-body" style="white-space:pre-wrap; font-size:12px; line-height:1.5;">
+            </div>
+        </div>
+    </div>
+    <div id="modal-new-group" class="modal">
+        <div class="modal-content" style="max-width:440px;">
+            <div class="modal-header"><strong>Novo grupo</strong><button class="header-btn" id="close-new-group"><svg viewBox="0 0 24 24" class="icon-outline" style="width:14px;height:14px;"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg></button></div>
+            <div class="modal-body">
+                <label for="new-group-name">Nome do grupo</label>
+                <input type="text" id="new-group-name" placeholder="Ex: PSAIs Cliente X" style="margin-bottom:12px;">
+                <label style="display:block; margin-bottom:6px;">Análises no grupo</label>
+                <div id="new-group-cases" class="new-group-cases-list" style="max-height:240px; overflow-y:auto; border:1px solid var(--border-color); border-radius:6px; padding:8px;"></div>
+                <button type="button" class="btn-primary btn-action" id="btn-create-group" style="margin-top:12px; width:100%;">Criar grupo</button>
+            </div>
+        </div>
+    </div>
+    <div id="modal-add-to-group" class="modal">
+        <div class="modal-content" style="max-width:440px;">
+            <div class="modal-header"><strong id="modal-add-to-group-title">Adicionar ao grupo</strong><button class="header-btn" id="close-add-to-group"><svg viewBox="0 0 24 24" class="icon-outline" style="width:14px;height:14px;"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg></button></div>
+            <div class="modal-body">
+                <label style="display:block; margin-bottom:6px;">Selecione as análises a adicionar</label>
+                <div id="add-to-group-cases" class="new-group-cases-list" style="max-height:240px; overflow-y:auto; border:1px solid var(--border-color); border-radius:6px; padding:8px;"></div>
+                <button type="button" class="btn-primary btn-action" id="btn-add-to-group" style="margin-top:12px; width:100%;">Adicionar</button>
+            </div>
+        </div>
+    </div>
+    <script src="logic.js"></script>
+</body>
+</html>
