@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="favicon.png">
     <title>DailyPlan | Product Focus</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Great+Vibes&display=swap" rel="stylesheet">
     <style>
         :root { --bg-body: #f3f4f6; --bg-sidebar: #ffffff; --bg-card: #ffffff; --bg-input: #ffffff; --border-color: #e5e7eb; --text-primary: #111827; --text-secondary: #6b7280; --tr-orange: #ff8000; --tr-orange-hover: #e67300; --active-blue: #2563eb; --active-bg: #eff6ff; --danger: #ef4444; --success: #10b981; --warning: #f59e0b; --shadow-sm: 0 1px 2px rgba(0,0,0,0.05); }
         body.dark-mode { --bg-body: #111827; --bg-sidebar: #1f2937; --bg-card: #1f2937; --bg-input: #374151; --border-color: #374151; --text-primary: #f9fafb; --text-secondary: #9ca3af; --tr-orange: #ff8000; --tr-orange-hover: #e67300; --active-blue: #60a5fa; --active-bg: #1e3a8a; }
@@ -381,7 +381,11 @@
 <body class="dark-mode auth-required">
     <div id="login-screen">
         <div class="login-box">
-            <img src="logo.png" alt="DailyPlan" style="width:200px; height:auto; border-radius:8px; margin-bottom:8px;">
+            <div style="margin-bottom:12px;">
+                <span style="font-family:'Great Vibes',cursive;font-size:42px;color:var(--text-primary);line-height:1;">Daily</span><br>
+                <span style="font-family:'Inter',sans-serif;font-size:24px;font-weight:700;color:var(--text-primary);letter-spacing:6px;text-transform:uppercase;">Plan</span><br>
+                <span style="font-family:'Inter',sans-serif;font-size:10px;font-weight:600;color:var(--text-secondary);letter-spacing:3px;text-transform:uppercase;">Product Focus</span>
+            </div>
             <div class="login-sub" style="margin-top:12px;">Entre com sua conta GitHub</div>
             <button type="button" id="btn-github-login"><svg viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>Entrar com GitHub</button>
             <div id="login-error"></div>
@@ -390,8 +394,9 @@
     <div id="sidebar">
         <div id="sidebar-header">
             <div class="tr-brand-area">
-                <div class="tr-logo-lockup">
-                    <img src="logo.png" alt="DailyPlan" style="height:36px; width:auto; border-radius:4px;">
+                <div class="tr-logo-lockup" style="gap:0;">
+                    <span style="font-family:'Great Vibes',cursive;font-size:22px;color:var(--text-primary);line-height:1;">Daily</span>
+                    <span style="font-family:'Inter',sans-serif;font-size:13px;font-weight:700;color:var(--text-primary);letter-spacing:3px;text-transform:uppercase;margin-left:2px;">Plan</span>
                 </div>
             </div>
         </div>
@@ -952,6 +957,6 @@
     var db = firebase.firestore();
     var githubProvider = new firebase.auth.GithubAuthProvider();
     </script>
-    <script src="logic.js?v=7.6"></script>
+    <script src="logic.js?v=7.7"></script>
 </body>
 </html>
