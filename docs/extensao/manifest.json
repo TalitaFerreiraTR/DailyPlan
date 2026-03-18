@@ -6,7 +6,8 @@
   "permissions": ["storage", "activeTab", "scripting", "tabs"],
   "host_permissions": [
     "https://*.dominiosistemas.com.br/*",
-    "http://*.dominiosistemas.com.br/*"
+    "http://*.dominiosistemas.com.br/*",
+    "https://talitaferreiratr.github.io/*"
   ],
   "background": { "service_worker": "background.js" },
   "action": {
@@ -27,6 +28,11 @@
     {
       "matches": ["https://sgsai.dominiosistemas.com.br/sgsai/faces/sai.html*"],
       "js": ["injector-sai.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://talitaferreiratr.github.io/DailyPlan/*"],
+      "js": ["sync-to-web.js"],
       "run_at": "document_idle"
     }
   ]
