@@ -836,10 +836,6 @@
             <div class="modal-header"><strong>Configurações</strong><button class="header-btn" id="close-settings"><svg viewBox="0 0 24 24" class="icon-outline" style="width:14px;height:14px;"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg></button></div>
             <div class="modal-body">
                 <div style="margin-bottom:16px;">
-                    <label style="display:block; margin-bottom:6px; font-size:11px; text-transform:uppercase; color:var(--text-secondary);">Usuário (gravar no backup)</label>
-                    <input type="text" id="settings-backup-user" placeholder="Seu nome para identificar o backup" style="width:100%; padding:8px 10px; font-size:12px; border:1px solid var(--border-color); border-radius:4px; background:var(--bg-input); color:var(--text-primary);">
-                </div>
-                <div style="margin-bottom:16px;">
                     <label style="display:block; margin-bottom:8px; font-size:11px; text-transform:uppercase; color:var(--text-secondary);">Tema</label>
                     <div class="theme-grid" id="theme-grid">
                         <div class="theme-option" data-theme="light"><div class="theme-swatch" style="background:#f3f4f6;"><div style="position:absolute;bottom:0;right:0;width:50%;height:50%;background:#ff8000;border-radius:0 0 7px 0;"></div></div><span>Claro</span></div>
@@ -953,6 +949,6 @@
     var db = firebase.firestore();
     var githubProvider = new firebase.auth.GithubAuthProvider();
     </script>
-    <script src="logic.js?v=7.0"></script>
+    <script src="logic.js?v=7.1"></script>
 </body>
 </html>

@@ -1929,6 +1929,7 @@ var VERSION_FILE_NAME = 'DailyPlanVersao.txt';
 var BACKUP_USER_KEY = 'dailyplan_backup_user';
 
 function getBackupUserName() {
+    if (currentUser && currentUser.username) return currentUser.username;
     try { return (localStorage.getItem(BACKUP_USER_KEY) || '').trim(); } catch (e) { return ''; }
 }
 function setBackupUserName(val) {
@@ -2180,8 +2181,6 @@ function openSettingsModal() {
     var pwdArea = getEl('settings-password-area');
     if (devArea) devArea.style.display = 'none';
     if (pwdArea) pwdArea.style.display = 'none';
-    var backupUserEl = getEl('settings-backup-user');
-    if (backupUserEl) backupUserEl.value = getBackupUserName();
     var theme = localStorage.getItem('psaiTheme') || 'dark';
     var grid = getEl('theme-grid');
     if (grid) {
@@ -2674,8 +2673,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     var fileInput = getEl('file-input'); if (fileInput) fileInput.addEventListener('change', function() { importData(this); });
-    var backupUserInput = getEl('settings-backup-user');
-    if (backupUserInput) backupUserInput.addEventListener('blur', function() { setBackupUserName(this.value); });
     var psaiLinkInput = getEl('input-psai-link');
     if (psaiLinkInput) psaiLinkInput.addEventListener('blur', function() {
         var code = getPsaiCode(this.value);
