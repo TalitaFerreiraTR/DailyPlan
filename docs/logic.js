@@ -9,6 +9,7 @@ let savedRange = null;
 let savedFocusElement = null;
 let autoSaveTimer = null;
 var currentUser = null; // { username, role: 'normal'|'gerente'|'desenvolvedor' }
+var adminViewMode = false;
 
 var APP_VERSION = '6.0';
 var firebaseUid = null;
@@ -170,9 +171,13 @@ function viewUserData(uid) {
         if (!doc.exists) { alert('Usuario nao encontrado.'); return; }
         var d = doc.data();
         var userCases = [];
+        var userGroups = [];
         try { userCases = JSON.parse(d.myCasesV14 || '[]'); } catch (e) {}
+        try { userGroups = JSON.parse(d.myGroupsV1 || '[]'); } catch (e) {}
         toggleModal('modal-admin', false);
+        adminViewMode = true;
         cases = userCases;
+        groups = userGroups;
         currentId = null;
         renderSidebar();
         var main = document.getElementById('main');
@@ -189,6 +194,7 @@ function viewUserData(uid) {
 }
 
 function exitAdminView() {
+    adminViewMode = false;
     var banner = document.getElementById('admin-view-banner');
     if (banner) banner.remove();
     storageGet(['myCasesV14', 'generalNotesList', 'myGroupsV1'], function(result) {
@@ -197,6 +203,7 @@ function exitAdminView() {
         if (result.myGroupsV1) { try { groups = JSON.parse(result.myGroupsV1); } catch (e) { groups = []; } } else { groups = []; }
         currentId = null;
         renderSidebar();
+        renderGroupsList();
     });
 }
 
@@ -296,6 +303,7 @@ function deleteNote(id) {
 
 // --- GRUPOS ---
 function saveGroups() {
+    if (adminViewMode) return;
     storageSet({ 'myGroupsV1': JSON.stringify(groups) }, function() { renderSidebar(); renderGroupsList(); });
 }
 function openGroupView(groupId) {
@@ -537,6 +545,7 @@ function cancelEditGroupName() {
 }
 
 function addNewCase(workType) {
+    if (adminViewMode) { alert('Visualização somente leitura. Volte aos seus dados primeiro.'); return; }
     var un = (currentUser && currentUser.username) ? currentUser.username : '';
     var c = { id: Date.now(), title: "Nova Análise", lastUpdated: Date.now(), workType: workType || (workTypeFilter !== 'all' ? workTypeFilter : "PSAI"), caseType: "", psaiDesc: "", psaiLink: "", psaiNivel: "", psaiData: "", companyTest: "", psaiTestDomain: "", psaiDominioLocalEmpresa: "", psaiDominioWebEmpresa: "", psaiDominioLocalRepro: false, psaiDominioWebRepro: false, psaiCompanySentEsocial: false, psaiTestCertificate: "", psaiTestPassword: "", psaiPausadoPor: "", psaiReuniaoDuvida: "", neStatus: "", obs: "", saiGenerated: "", saiStatus: "", saiChangeLevel: "", saiScore: "", saiData: "", saiPriority: "", saiPrazo: "", saiAssunto: "", saiObs: "", ssNumero: "", ssData: "", status: "Em definição", priority: "null", deadline: "", links: [], ssTramites: [], researchByTopic: { saiLiberadas: [], ne: [], outros: [] }, managerReviews: [], tests: "", solution: "", createdBy: un, lastModifiedBy: un };
     cases.push(c);
@@ -545,6 +554,7 @@ function addNewCase(workType) {
 }
 
 function saveData(silent) {
+    if (adminViewMode) return;
     silent = silent === true;
     var un = (currentUser && currentUser.username) ? currentUser.username : '';
     if (currentId) { var c = cases.find(function(x) { return x.id === currentId; }); if (c) { c.lastUpdated = Date.now(); c.lastModifiedBy = un; if (!c.createdBy) c.createdBy = un; } }
@@ -559,9 +569,10 @@ function saveData(silent) {
     });
 }
 
-function triggerAutoSave() { saveCurrentCaseMemory(); renderSidebar(); clearTimeout(autoSaveTimer); autoSaveTimer = setTimeout(() => { saveData(true); }, 1000); }
+function triggerAutoSave() { if (adminViewMode) return; saveCurrentCaseMemory(); renderSidebar(); clearTimeout(autoSaveTimer); autoSaveTimer = setTimeout(() => { saveData(true); }, 1000); }
 
 function deleteCase() {
+    if (adminViewMode) { alert('Visualização somente leitura.'); return; }
     if (!currentId || !confirm('Excluir análise permanentemente?')) return;
     var idToRemove = currentId;
     cases = cases.filter(function(c) { return c.id !== currentId; });
@@ -617,6 +628,7 @@ function toggleCaseSelect(id) {
     updateSelectCount();
 }
 function deleteSelectedCases() {
+    if (adminViewMode) { alert('Visualização somente leitura.'); return; }
     var ids = Object.keys(selectedCaseIds).map(Number);
     if (ids.length === 0) { alert('Nenhuma análise selecionada.'); return; }
     if (!confirm('Excluir ' + ids.length + ' análise(s) permanentemente?')) return;
