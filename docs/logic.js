@@ -42,6 +42,7 @@ function _flushToFirestore() {
     var update = { lastUpdated: firebase.firestore.FieldValue.serverTimestamp() };
     Object.keys(_firestorePendingData).forEach(function(k) { update[k] = _firestorePendingData[k]; });
     _firestorePendingData = {};
+    localStorage.setItem('dp_lastSyncTs', String(Date.now()));
     db.collection('users').doc(firebaseUid).set(update, { merge: true }).catch(function(e) { console.warn('Firestore save error:', e); });
 }
 window.addEventListener('beforeunload', _flushToFirestore);
@@ -51,9 +52,16 @@ function _loadFromFirestore(callback) {
     db.collection('users').doc(firebaseUid).get().then(function(doc) {
         if (doc.exists) {
             var data = doc.data();
-            SYNC_KEYS.forEach(function(k) {
-                if (data[k]) localStorage.setItem(k, data[k]);
-            });
+            var localHasData = SYNC_KEYS.some(function(k) { return !!localStorage.getItem(k); });
+            var remoteHasData = SYNC_KEYS.some(function(k) { return !!data[k]; });
+            if (remoteHasData) {
+                var remoteTs = data.lastUpdated ? data.lastUpdated.toMillis() : 0;
+                var localTs = parseInt(localStorage.getItem('dp_lastSyncTs') || '0', 10);
+                if (!localHasData || remoteTs > localTs) {
+                    SYNC_KEYS.forEach(function(k) { if (data[k]) localStorage.setItem(k, data[k]); });
+                    if (remoteTs) localStorage.setItem('dp_lastSyncTs', String(remoteTs));
+                }
+            }
         }
         if (callback) callback();
     }).catch(function(e) { console.warn('Firestore load error:', e); if (callback) callback(); });
@@ -2029,9 +2037,17 @@ function importData(input) {
         cases.forEach(function(c) { if (!c.workType) c.workType = 'PSAI'; });
         if (data && Array.isArray(data.groups)) groups = data.groups;
         else groups = [];
-        storageSet({ 'myCasesV14': JSON.stringify(cases), 'myGroupsV1': JSON.stringify(groups) }, function() {
+        var importPayload = { 'myCasesV14': JSON.stringify(cases), 'myGroupsV1': JSON.stringify(groups) };
+        Object.keys(importPayload).forEach(function(k) { localStorage.setItem(k, importPayload[k]); });
+        if (firebaseUid && typeof db !== 'undefined') {
+            var update = { lastUpdated: firebase.firestore.FieldValue.serverTimestamp() };
+            Object.keys(importPayload).forEach(function(k) { update[k] = importPayload[k]; });
+            db.collection('users').doc(firebaseUid).set(update, { merge: true }).then(function() {
+                location.reload();
+            }).catch(function() { location.reload(); });
+        } else {
             location.reload();
-        });
+        }
         input.value = '';
     };
     reader.onerror = function() { alert('Erro ao ler o arquivo.'); input.value = ''; };
