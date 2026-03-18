@@ -11,112 +11,172 @@ let autoSaveTimer = null;
 var currentUser = null; // { username, role: 'normal'|'gerente'|'desenvolvedor' }
 
 var APP_VERSION = '6.0';
-var _useChrome = (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local);
+var firebaseUid = null;
+var _firestoreSaveTimer = null;
 
+// --- STORAGE: localStorage como cache rapido + Firestore como persistencia ---
 function storageGet(keys, callback) {
-    if (_useChrome) {
-        chrome.storage.local.get(keys, callback);
-    } else {
-        var result = {};
-        keys.forEach(function(k) { result[k] = localStorage.getItem(k) || null; });
-        callback(result);
-    }
+    var result = {};
+    keys.forEach(function(k) { result[k] = localStorage.getItem(k) || null; });
+    callback(result);
 }
 function storageSet(obj, callback) {
-    if (_useChrome) {
-        chrome.storage.local.set(obj, callback || function() {});
-    } else {
-        Object.keys(obj).forEach(function(k) { localStorage.setItem(k, obj[k]); });
-        if (callback) callback();
-    }
+    Object.keys(obj).forEach(function(k) { localStorage.setItem(k, obj[k]); });
+    if (callback) callback();
+    _syncToFirestore(obj);
 }
 function storageRemove(keys, callback) {
-    if (_useChrome) {
-        chrome.storage.local.remove(keys, callback || function() {});
-    } else {
-        (Array.isArray(keys) ? keys : [keys]).forEach(function(k) { localStorage.removeItem(k); });
+    (Array.isArray(keys) ? keys : [keys]).forEach(function(k) { localStorage.removeItem(k); });
+    if (callback) callback();
+}
+function _syncToFirestore(obj) {
+    if (!firebaseUid || typeof db === 'undefined') return;
+    clearTimeout(_firestoreSaveTimer);
+    _firestoreSaveTimer = setTimeout(function() {
+        var update = { lastUpdated: firebase.firestore.FieldValue.serverTimestamp() };
+        Object.keys(obj).forEach(function(k) { update[k] = obj[k]; });
+        db.collection('users').doc(firebaseUid).set(update, { merge: true }).catch(function(e) { console.warn('Firestore save error:', e); });
+    }, 2000);
+}
+function _loadFromFirestore(callback) {
+    if (!firebaseUid || typeof db === 'undefined') { if (callback) callback(); return; }
+    db.collection('users').doc(firebaseUid).get().then(function(doc) {
+        if (doc.exists) {
+            var data = doc.data();
+            ['myCasesV14', 'generalNotesList', 'myGroupsV1'].forEach(function(k) {
+                if (data[k]) localStorage.setItem(k, data[k]);
+            });
+        }
         if (callback) callback();
-    }
+    }).catch(function(e) { console.warn('Firestore load error:', e); if (callback) callback(); });
 }
 
-// --- AUTENTICAÇÃO E USUÁRIOS ---
-var AUTH_USERS_KEY = 'dailyplan_users';
-var AUTH_CURRENT_KEY = 'dailyplan_currentUser';
-
-function authGet(key) {
-    return new Promise(function(resolve) {
-        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-            chrome.storage.local.get([key], function(r) { resolve(r[key] != null ? r[key] : null); });
-        } else {
-            try { var v = localStorage.getItem(key); resolve(v !== null ? JSON.parse(v) : null); } catch (e) { resolve(null); }
-        }
+// --- AUTENTICACAO FIREBASE + GITHUB ---
+function loginWithGitHub() {
+    var errorEl = document.getElementById('login-error');
+    if (errorEl) errorEl.textContent = '';
+    firebase.auth().signInWithPopup(githubProvider).catch(function(err) {
+        if (errorEl) errorEl.textContent = 'Erro ao entrar: ' + (err.message || err.code || 'tente novamente');
     });
 }
-function authSet(key, val) {
-    return new Promise(function(resolve) {
-        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-            chrome.storage.local.set({ [key]: val }, resolve);
-        } else {
-            try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
-            resolve();
-        }
+function logoutUser() {
+    firebase.auth().signOut().then(function() {
+        currentUser = null;
+        firebaseUid = null;
+        localStorage.clear();
+        location.reload();
     });
 }
-
-function hashPassword(plain) {
-    return crypto.subtle.digest('SHA-256', new TextEncoder().encode(plain || '')).then(function(buf) {
-        return Array.from(new Uint8Array(buf)).map(function(b) { return ('0' + b.toString(16)).slice(-2); }).join('');
-    });
-}
-
-function getUsers() {
-    return authGet(AUTH_USERS_KEY).then(function(r) { return Array.isArray(r) ? r : []; });
-}
-function setUsers(arr) {
-    return authSet(AUTH_USERS_KEY, arr);
-}
-
-function getCurrentUserSync() {
-    return currentUser;
-}
-function getCurrentUser() {
-    return authGet(AUTH_CURRENT_KEY).then(function(u) { currentUser = u; return u; });
-}
-function setCurrentUser(u) {
-    currentUser = u;
-    return authSet(AUTH_CURRENT_KEY, u);
-}
-function clearCurrentUser() {
-    currentUser = null;
-    return authSet(AUTH_CURRENT_KEY, null);
-}
-
-function doLogin(username, password) {
-    var user = (username || '').trim().toLowerCase();
-    var pass = password || '';
-    return getUsers().then(function(users) {
-        return hashPassword(pass).then(function(hash) {
-            var found = users.find(function(x) { return (x.username || '').toLowerCase() === user && x.passwordHash === hash; });
-            return found ? { username: found.username, role: found.role || 'normal' } : null;
-        });
-    });
-}
+function getCurrentUserSync() { return currentUser; }
 
 function showUserBar() {
-    var bar = getEl('user-bar');
-    var nameEl = getEl('current-username');
-    if (bar) bar.style.display = 'flex';
-    if (nameEl && currentUser) nameEl.textContent = currentUser.username + (currentUser.role === 'desenvolvedor' ? ' (dev)' : currentUser.role === 'gerente' ? ' (gerente)' : '');
+    var bar = document.getElementById('user-bar');
+    var nameEl = document.getElementById('user-display-name');
+    var roleEl = document.getElementById('user-role-label');
+    var avatarEl = document.getElementById('user-avatar');
+    var adminBtn = document.getElementById('btn-admin-panel');
+    if (!bar || !currentUser) return;
+    bar.style.display = 'flex';
+    if (nameEl) nameEl.textContent = currentUser.username || '';
+    if (roleEl) roleEl.textContent = currentUser.role === 'gerente' ? 'Gerente (Admin)' : 'Analista';
+    if (avatarEl && currentUser.photoURL) { avatarEl.src = currentUser.photoURL; avatarEl.style.display = 'block'; } else if (avatarEl) { avatarEl.style.display = 'none'; }
+    if (adminBtn) adminBtn.style.display = (currentUser.role === 'gerente') ? 'flex' : 'none';
 }
 
-function renderUsersList() {
-    var list = getEl('users-list');
+function _onAuthReady(fbUser, callback) {
+    if (!fbUser) {
+        document.body.classList.add('auth-required');
+        return;
+    }
+    firebaseUid = fbUser.uid;
+    var userRef = db.collection('users').doc(fbUser.uid);
+    userRef.get().then(function(doc) {
+        var role = 'normal';
+        if (doc.exists && doc.data().role) {
+            role = doc.data().role;
+        } else {
+            userRef.set({
+                displayName: fbUser.displayName || fbUser.email || '',
+                email: fbUser.email || '',
+                photoURL: fbUser.photoURL || '',
+                role: 'normal',
+                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+        }
+        currentUser = {
+            username: fbUser.displayName || fbUser.email || 'usuario',
+            role: role,
+            photoURL: fbUser.photoURL || '',
+            uid: fbUser.uid
+        };
+        _loadFromFirestore(function() {
+            document.body.classList.remove('auth-required');
+            if (callback) callback();
+        });
+    }).catch(function(e) {
+        console.warn('Auth profile error:', e);
+        currentUser = { username: fbUser.displayName || 'usuario', role: 'normal', photoURL: fbUser.photoURL || '', uid: fbUser.uid };
+        document.body.classList.remove('auth-required');
+        if (callback) callback();
+    });
+}
+
+// --- ADMIN: ver dados de todos os usuarios ---
+function loadAdminUsersList() {
+    var list = document.getElementById('admin-users-list');
     if (!list) return;
-    getUsers().then(function(users) {
-        list.innerHTML = users.length === 0 ? '<p style="color:var(--text-secondary); font-size:12px;">Nenhum usuário.</p>' : users.map(function(u) {
-            var roleLabel = u.role === 'desenvolvedor' ? 'Desenvolvedor' : u.role === 'gerente' ? 'Gerente' : 'Normal';
-            return '<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border-color);"><span><strong>' + escapeHtml(u.username) + '</strong> <span style="font-size:11px; color:var(--text-secondary);">' + roleLabel + '</span></span></div>';
-        }).join('');
+    list.innerHTML = '<p style="color:var(--text-secondary); font-size:12px;">Carregando...</p>';
+    db.collection('users').get().then(function(snapshot) {
+        if (snapshot.empty) { list.innerHTML = '<p style="color:var(--text-secondary);">Nenhum usuario encontrado.</p>'; return; }
+        var html = '';
+        snapshot.forEach(function(doc) {
+            var d = doc.data();
+            var casesCount = 0;
+            try { casesCount = JSON.parse(d.myCasesV14 || '[]').length; } catch (e) {}
+            html += '<div class="admin-user-item" data-uid="' + doc.id + '">' +
+                '<img src="' + (d.photoURL || '') + '" onerror="this.style.display=\'none\'" alt="">' +
+                '<div style="flex:1;"><div class="admin-user-name">' + escapeHtml(d.displayName || d.email || doc.id) + '</div>' +
+                '<div class="admin-user-meta">' + (d.role === 'gerente' ? 'Gerente' : 'Analista') + ' | ' + casesCount + ' analises</div></div></div>';
+        });
+        list.innerHTML = html;
+        list.querySelectorAll('.admin-user-item').forEach(function(el) {
+            el.addEventListener('click', function() { viewUserData(el.getAttribute('data-uid')); });
+        });
+    }).catch(function(e) { list.innerHTML = '<p style="color:var(--danger);">Erro ao carregar: ' + e.message + '</p>'; });
+}
+
+function viewUserData(uid) {
+    db.collection('users').doc(uid).get().then(function(doc) {
+        if (!doc.exists) { alert('Usuario nao encontrado.'); return; }
+        var d = doc.data();
+        var userCases = [];
+        try { userCases = JSON.parse(d.myCasesV14 || '[]'); } catch (e) {}
+        toggleModal('modal-admin', false);
+        cases = userCases;
+        currentId = null;
+        renderSidebar();
+        var main = document.getElementById('main');
+        if (main) {
+            var banner = document.createElement('div');
+            banner.id = 'admin-view-banner';
+            banner.style.cssText = 'padding:10px 16px;background:rgba(255,128,0,0.15);border-bottom:1px solid var(--tr-orange);font-size:12px;color:var(--tr-orange);display:flex;align-items:center;justify-content:space-between;';
+            banner.innerHTML = '<span>Visualizando dados de <strong>' + escapeHtml(d.displayName || uid) + '</strong> (somente leitura)</span><button type="button" onclick="exitAdminView()" style="background:var(--tr-orange);color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:11px;">Voltar aos meus dados</button>';
+            var existing = document.getElementById('admin-view-banner');
+            if (existing) existing.remove();
+            main.prepend(banner);
+        }
+    });
+}
+
+function exitAdminView() {
+    var banner = document.getElementById('admin-view-banner');
+    if (banner) banner.remove();
+    storageGet(['myCasesV14', 'generalNotesList', 'myGroupsV1'], function(result) {
+        if (result.myCasesV14) { try { cases = JSON.parse(result.myCasesV14); } catch (e) { cases = []; } } else { cases = []; }
+        if (result.generalNotesList) { try { notes = JSON.parse(result.generalNotesList); } catch (e) { notes = []; } } else { notes = []; }
+        if (result.myGroupsV1) { try { groups = JSON.parse(result.myGroupsV1); } catch (e) { groups = []; } } else { groups = []; }
+        currentId = null;
+        renderSidebar();
     });
 }
 
@@ -2001,20 +2061,7 @@ function openSettingsModal() {
     openSettingsModalReminder();
     toggleModal('modal-settings', true);
 }
-function doChangePassword(currentPassword, newPassword) {
-    var un = (currentUser && currentUser.username) ? currentUser.username : '';
-    if (!un) return Promise.resolve(false);
-    return getUsers().then(function(users) {
-        return hashPassword(currentPassword).then(function(currentHash) {
-            var u = users.find(function(x) { return (x.username || '').toLowerCase() === un.toLowerCase(); });
-            if (!u || u.passwordHash !== currentHash) return false;
-            return hashPassword(newPassword).then(function(newHash) {
-                u.passwordHash = newHash;
-                return setUsers(users).then(function() { return true; });
-            });
-        });
-    });
-}
+function doChangePassword() { return Promise.resolve(false); }
 function openInTab() { if (typeof chrome !== 'undefined' && chrome.tabs) chrome.tabs.create({ url: 'painel.html' }); else window.open('index.html', '_blank'); }
 /** Extrai apenas o código da PSAI (ex: 117543) de um link ou do campo. */
 function getPsaiCode(val) {
@@ -2526,6 +2573,21 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     }
 
-    document.body.classList.remove('auth-required');
-    runApp();
+    var loginBtn = document.getElementById('btn-github-login');
+    if (loginBtn) loginBtn.addEventListener('click', loginWithGitHub);
+    var logoutBtn = document.getElementById('btn-logout');
+    if (logoutBtn) logoutBtn.addEventListener('click', logoutUser);
+    var adminBtn = document.getElementById('btn-admin-panel');
+    if (adminBtn) adminBtn.addEventListener('click', function() { loadAdminUsersList(); toggleModal('modal-admin', true); });
+    var closeAdminBtn = document.getElementById('close-admin');
+    if (closeAdminBtn) closeAdminBtn.addEventListener('click', function() { toggleModal('modal-admin', false); });
+
+    if (typeof firebase !== 'undefined' && firebase.auth) {
+        firebase.auth().onAuthStateChanged(function(fbUser) {
+            _onAuthReady(fbUser, function() { runApp(); });
+        });
+    } else {
+        document.body.classList.remove('auth-required');
+        runApp();
+    }
 });
