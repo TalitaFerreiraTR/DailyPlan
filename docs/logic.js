@@ -257,6 +257,17 @@ function init() {
         if (e.data && e.data.type === 'DP_EXT_SYNC') {
             loadFromStorage();
         }
+        if (e.data && e.data.type === 'DP_SCRAPE_SS_RESULT') {
+            var resp = e.data.data || {};
+            if (resp.html) {
+                var data = parseSSHtml(resp.html);
+                applyParsedSS(data);
+                var badge = getEl('ss-tramites-badge');
+                if (badge) badge.textContent = (data.tramitesCount || 0) + ((data.tramitesCount || 0) === 1 ? ' Trâmite' : ' Trâmites');
+            } else if (resp.error) {
+                alert(resp.error);
+            }
+        }
     });
     window.addEventListener('storage', function(e) {
         if (e.key === 'myCasesV14' && e.newValue) { try { cases = JSON.parse(e.newValue); } catch (ex) {} renderSidebar(); }
@@ -2621,48 +2632,25 @@ document.addEventListener('DOMContentLoaded', function() {
             toggleModal('modal-ler-ss', false);
         },
         'btn-ler-ss-aba': function() {
-            var hasExtension = (typeof chrome !== 'undefined' && chrome.tabs && chrome.runtime && chrome.runtime.id);
-            if (!hasExtension) {
-                setVal('ss-html-paste', ''); toggleModal('modal-ler-ss', true);
-                return;
-            }
             var ssNumero = (getVal('input-ss-numero') || '').trim();
-            if (!ssNumero) {
-                alert('Informe o código da SS no painel (campo Cód. SS) antes de usar "Ler da Aba Aberta".');
+            var hasNativeAccess = (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.query);
+            if (hasNativeAccess) {
+                if (!ssNumero) { alert('Informe o código da SS no painel (campo Cód. SS) antes de usar "Ler da Aba Aberta".'); return; }
+                chrome.tabs.query({ url: '*://sgd.dominiosistemas.com.br/sgsa/faces/ss.html*' }, function(tabs) {
+                    if (!tabs || tabs.length === 0) { alert('Nenhuma aba com a página da SS encontrada.\nAbra a SS no navegador e tente novamente.'); return; }
+                    var tab = null;
+                    for (var i = 0; i < tabs.length; i++) { var m = (tabs[i].url || '').match(/[?&]ss=([0-9]+)/); if (m && m[1] === ssNumero) { tab = tabs[i]; break; } }
+                    if (!tab) { alert('Nenhuma aba aberta com a SS ' + ssNumero + '.'); return; }
+                    chrome.tabs.sendMessage(tab.id, { action: 'SCRAPE_SS' }, function(response) {
+                        if (chrome.runtime.lastError) { alert('Não foi possível ler a aba. Recarregue a página da SS (F5) e tente de novo.'); return; }
+                        if (response && response.html) { var data = parseSSHtml(response.html); applyParsedSS(data); var badge = getEl('ss-tramites-badge'); if (badge) badge.textContent = (data.tramitesCount || 0) + ((data.tramitesCount || 0) === 1 ? ' Trâmite' : ' Trâmites'); }
+                        else { alert(response && response.error ? response.error : 'Resposta inválida da aba.'); }
+                    });
+                });
                 return;
             }
-            chrome.tabs.query({ url: '*://sgd.dominiosistemas.com.br/sgsa/faces/ss.html*' }, function(tabs) {
-                if (!tabs || tabs.length === 0) {
-                    alert('Nenhuma aba com a página da SS (sistema legado) encontrada.\nAbra a SS no navegador (sgd.dominiosistemas.com.br) e tente novamente.');
-                    return;
-                }
-                var reSs = new RegExp('[?&]ss=([0-9]+)');
-                var tab = null;
-                for (var i = 0; i < tabs.length; i++) {
-                    var m = (tabs[i].url || '').match(reSs);
-                    if (m && m[1] === ssNumero) { tab = tabs[i]; break; }
-                }
-                if (!tab) {
-                    alert('Nenhuma aba aberta com a SS ' + ssNumero + '.\nAbra a página da SS ' + ssNumero + ' no navegador (sgd.dominiosistemas.com.br/sgsa/faces/ss.html?ss=' + ssNumero + ') e tente novamente.');
-                    return;
-                }
-                chrome.tabs.sendMessage(tab.id, { action: 'SCRAPE_SS' }, function(response) {
-                    if (chrome.runtime.lastError) {
-                        alert('Não foi possível ler a aba. Recarregue a página da SS (F5) e tente de novo.');
-                        return;
-                    }
-                    if (response && response.html) {
-                        var data = parseSSHtml(response.html);
-                        applyParsedSS(data);
-                        var badge = getEl('ss-tramites-badge');
-                        if (badge) badge.textContent = (data.tramitesCount || 0) + ((data.tramitesCount || 0) === 1 ? ' Trâmite' : ' Trâmites');
-                    } else if (response && response.error) {
-                        alert('Erro ao extrair dados: ' + response.error);
-                    } else {
-                        alert('Resposta inválida da aba. Recarregue a página da SS e tente novamente.');
-                    }
-                });
-            });
+            window.postMessage({ type: 'DP_REQUEST_SCRAPE_SS', ssNumero: ssNumero }, '*');
+            alert('Lendo SS da aba aberta... Aguarde um momento.');
         }
     };
     for (var actionId in actions) { if (!actions.hasOwnProperty(actionId)) continue; var el = getEl(actionId); if (el) el.addEventListener('click', actions[actionId]); }

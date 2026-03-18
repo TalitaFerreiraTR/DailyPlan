@@ -39,4 +39,13 @@
     chrome.runtime.onMessage.addListener(function(msg) {
         if (msg && msg.action === 'DP_SYNC_FROM_EXT') mergeAndNotify();
     });
+
+    window.addEventListener('message', function(event) {
+        if (event.source !== window || !event.data) return;
+        if (event.data.type === 'DP_REQUEST_SCRAPE_SS') {
+            chrome.runtime.sendMessage({ action: 'DP_SCRAPE_SS_TAB', ssNumero: event.data.ssNumero || '' }, function(response) {
+                window.postMessage({ type: 'DP_SCRAPE_SS_RESULT', data: response || { error: 'Extensão não respondeu.' } }, '*');
+            });
+        }
+    });
 })();
