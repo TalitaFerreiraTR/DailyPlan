@@ -228,21 +228,12 @@ function init() {
         });
     }
     loadFromStorage();
-    if (_useChrome && chrome.storage.onChanged) {
-        chrome.storage.onChanged.addListener(function(changes) {
-            if (changes.myCasesV14 && changes.myCasesV14.newValue) { try { cases = JSON.parse(changes.myCasesV14.newValue); } catch (e) {} renderSidebar(); }
-            if (changes.myGroupsV1 && changes.myGroupsV1.newValue) { try { groups = JSON.parse(changes.myGroupsV1.newValue); } catch (e) {} renderSidebar(); renderGroupsList(); }
-            if (changes.generalNotesList && changes.generalNotesList.newValue) { try { notes = JSON.parse(changes.generalNotesList.newValue); } catch (e) {} renderNotes(); }
-            if (changes.pendingSSHtml || changes.pendingSSCaseId) tryApplyPendingSS();
-        });
-    } else {
-        window.addEventListener('storage', function(e) {
-            if (e.key === 'myCasesV14' && e.newValue) { try { cases = JSON.parse(e.newValue); } catch (ex) {} renderSidebar(); }
-            if (e.key === 'myGroupsV1' && e.newValue) { try { groups = JSON.parse(e.newValue); } catch (ex) {} renderSidebar(); renderGroupsList(); }
-            if (e.key === 'generalNotesList' && e.newValue) { try { notes = JSON.parse(e.newValue); } catch (ex) {} renderNotes(); }
-            if (e.key === 'pendingSSHtml' || e.key === 'pendingSSCaseId') tryApplyPendingSS();
-        });
-    }
+    window.addEventListener('storage', function(e) {
+        if (e.key === 'myCasesV14' && e.newValue) { try { cases = JSON.parse(e.newValue); } catch (ex) {} renderSidebar(); }
+        if (e.key === 'myGroupsV1' && e.newValue) { try { groups = JSON.parse(e.newValue); } catch (ex) {} renderSidebar(); renderGroupsList(); }
+        if (e.key === 'generalNotesList' && e.newValue) { try { notes = JSON.parse(e.newValue); } catch (ex) {} renderNotes(); }
+        if (e.key === 'pendingSSHtml' || e.key === 'pendingSSCaseId') tryApplyPendingSS();
+    });
 }
 
 // --- FUNÇÕES DE NOTAS ---
