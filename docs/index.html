@@ -8,6 +8,13 @@
     <style>
         :root { --bg-body: #f3f4f6; --bg-sidebar: #ffffff; --bg-card: #ffffff; --bg-input: #ffffff; --border-color: #e5e7eb; --text-primary: #111827; --text-secondary: #6b7280; --tr-orange: #ff8000; --tr-orange-hover: #e67300; --active-blue: #2563eb; --active-bg: #eff6ff; --danger: #ef4444; --success: #10b981; --warning: #f59e0b; --shadow-sm: 0 1px 2px rgba(0,0,0,0.05); }
         body.dark-mode { --bg-body: #111827; --bg-sidebar: #1f2937; --bg-card: #1f2937; --bg-input: #374151; --border-color: #374151; --text-primary: #f9fafb; --text-secondary: #9ca3af; --tr-orange: #ff8000; --tr-orange-hover: #e67300; --active-blue: #60a5fa; --active-bg: #1e3a8a; }
+        body.theme-ocean { --bg-body: #0f172a; --bg-sidebar: #1e293b; --bg-card: #1e293b; --bg-input: #334155; --border-color: #334155; --text-primary: #e2e8f0; --text-secondary: #94a3b8; --tr-orange: #06b6d4; --tr-orange-hover: #0891b2; --active-blue: #38bdf8; --active-bg: #0c4a6e; }
+        body.theme-forest { --bg-body: #0f1a0f; --bg-sidebar: #1a2e1a; --bg-card: #1a2e1a; --bg-input: #2d4a2d; --border-color: #2d4a2d; --text-primary: #e8f5e8; --text-secondary: #90b090; --tr-orange: #22c55e; --tr-orange-hover: #16a34a; --active-blue: #4ade80; --active-bg: #14532d; }
+        body.theme-violet { --bg-body: #1a1025; --bg-sidebar: #2a1f3d; --bg-card: #2a1f3d; --bg-input: #3d2e56; --border-color: #3d2e56; --text-primary: #ede9fe; --text-secondary: #a78bfa; --tr-orange: #8b5cf6; --tr-orange-hover: #7c3aed; --active-blue: #a78bfa; --active-bg: #4c1d95; }
+        body.theme-midnight { --bg-body: #030712; --bg-sidebar: #0a0f1a; --bg-card: #0a0f1a; --bg-input: #1a2035; --border-color: #1e293b; --text-primary: #e2e8f0; --text-secondary: #64748b; --tr-orange: #3b82f6; --tr-orange-hover: #2563eb; --active-blue: #60a5fa; --active-bg: #1e3a8a; }
+        body.theme-rose { --bg-body: #fff1f2; --bg-sidebar: #ffffff; --bg-card: #ffffff; --bg-input: #fff5f5; --border-color: #fecdd3; --text-primary: #1c1917; --text-secondary: #78716c; --tr-orange: #e11d48; --tr-orange-hover: #be123c; --active-blue: #f43f5e; --active-bg: #fff1f2; }
+        body.theme-sunset { --bg-body: #1c1210; --bg-sidebar: #2a1d18; --bg-card: #2a1d18; --bg-input: #3d2b22; --border-color: #3d2b22; --text-primary: #fde8d8; --text-secondary: #c4a68a; --tr-orange: #f97316; --tr-orange-hover: #ea580c; --active-blue: #fb923c; --active-bg: #7c2d12; }
+        body.theme-aqua { --bg-body: #ecfeff; --bg-sidebar: #ffffff; --bg-card: #ffffff; --bg-input: #f0fdfa; --border-color: #a7f3d0; --text-primary: #134e4a; --text-secondary: #5eead4; --tr-orange: #14b8a6; --tr-orange-hover: #0d9488; --active-blue: #2dd4bf; --active-bg: #ccfbf1; }
         * { box-sizing: border-box; } 
         
         /* Layout Híbrido */
@@ -346,6 +353,24 @@
         .color-palette { display: none; position: absolute; top: 100%; left: 0; margin-top: 4px; z-index: 1000; background: var(--bg-card); border: 1px solid var(--border-color); padding: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); width: auto; grid-template-columns: repeat(4, 1fr); gap: 4px; border-radius: 6px; }
         .color-swatch { width: 24px; height: 24px; border-radius: 4px; cursor: pointer; border: 1px solid var(--border-color); }
         .color-swatch:hover { transform: scale(1.1); box-shadow: 0 0 0 2px var(--tr-orange); }
+
+        .select-mode-bar { display:none; padding:8px 12px; background:var(--bg-input); border-bottom:1px solid var(--border-color); gap:6px; align-items:center; }
+        .select-mode-bar.visible { display:flex; }
+        .select-mode-bar .select-count { font-size:11px; color:var(--text-secondary); flex:1; }
+        .select-mode-bar button { font-size:11px; padding:4px 10px; border-radius:4px; cursor:pointer; border:1px solid var(--border-color); background:var(--bg-card); color:var(--text-primary); }
+        .select-mode-bar .btn-delete-selected { background:var(--danger); color:#fff; border-color:var(--danger); }
+        .select-mode-bar .btn-delete-selected:hover { opacity:0.9; }
+        .case-item .select-check { display:none; width:18px; height:18px; accent-color:var(--tr-orange); margin-right:8px; flex-shrink:0; cursor:pointer; margin-top:2px; }
+        body.bulk-select-mode .case-item .select-check { display:block; }
+        body.bulk-select-mode .case-item { cursor:default; }
+
+        .theme-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; }
+        .theme-option { display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; padding:6px; border-radius:6px; border:2px solid transparent; transition:0.2s; }
+        .theme-option:hover { border-color:var(--text-secondary); }
+        .theme-option.active { border-color:var(--tr-orange); }
+        .theme-swatch { width:36px; height:36px; border-radius:8px; border:1px solid rgba(128,128,128,0.3); position:relative; overflow:hidden; }
+        .theme-swatch::after { content:''; position:absolute; bottom:0; right:0; width:50%; height:50%; border-radius:0 0 7px 0; }
+        .theme-option span { font-size:9px; color:var(--text-secondary); text-align:center; line-height:1.2; }
     </style>
 </head>
 <body class="dark-mode auth-required">
@@ -405,10 +430,19 @@
             </div>
             <div id="groups-list" class="groups-list" style="max-height:120px; overflow-y:auto;"></div>
         </div>
+        <div id="select-mode-bar" class="select-mode-bar">
+            <input type="checkbox" id="select-all-check" style="width:16px;height:16px;accent-color:var(--tr-orange);cursor:pointer;" title="Selecionar todos">
+            <span class="select-count" id="select-count">0 selecionado(s)</span>
+            <button type="button" class="btn-delete-selected" id="btn-delete-selected" title="Excluir selecionados"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:12px;height:12px;vertical-align:-2px;margin-right:3px;stroke:#fff;"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Excluir</button>
+            <button type="button" id="btn-cancel-select" title="Cancelar seleção">Cancelar</button>
+        </div>
         <div id="case-list" class="case-list"></div>
         <div id="sidebar-footer">
             <div class="footer-main">
-                <button type="button" id="add-btn" class="btn-with-icon"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;"><path d="M12 5v14M5 12h14"/></svg> Nova Análise</button>
+                <div style="display:flex;gap:8px;width:100%;">
+                    <button type="button" id="add-btn" class="btn-with-icon" style="flex:1;"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;"><path d="M12 5v14M5 12h14"/></svg> Nova Análise</button>
+                    <button type="button" id="btn-select-mode" class="btn-with-icon" style="padding:12px;background:var(--bg-input);color:var(--text-secondary);border:1px solid var(--border-color);border-radius:6px;cursor:pointer;font-size:12px;" title="Selecionar para excluir"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:16px;height:16px;"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></button>
+                </div>
                 <input type="file" id="file-input" accept=".json,application/json" style="display:none">
             </div>
         </div>
@@ -806,9 +840,17 @@
                     <input type="text" id="settings-backup-user" placeholder="Seu nome para identificar o backup" style="width:100%; padding:8px 10px; font-size:12px; border:1px solid var(--border-color); border-radius:4px; background:var(--bg-input); color:var(--text-primary);">
                 </div>
                 <div style="margin-bottom:16px;">
-                    <div style="display:flex; gap:8px;">
-                        <button type="button" class="btn-secondary btn-action" id="settings-theme-light" data-theme="light" style="flex:1;">Claro</button>
-                        <button type="button" class="btn-secondary btn-action" id="settings-theme-dark" data-theme="dark" style="flex:1;">Escuro</button>
+                    <label style="display:block; margin-bottom:8px; font-size:11px; text-transform:uppercase; color:var(--text-secondary);">Tema</label>
+                    <div class="theme-grid" id="theme-grid">
+                        <div class="theme-option" data-theme="light"><div class="theme-swatch" style="background:#f3f4f6;"><div style="position:absolute;bottom:0;right:0;width:50%;height:50%;background:#ff8000;border-radius:0 0 7px 0;"></div></div><span>Claro</span></div>
+                        <div class="theme-option" data-theme="dark"><div class="theme-swatch" style="background:#1f2937;"><div style="position:absolute;bottom:0;right:0;width:50%;height:50%;background:#ff8000;border-radius:0 0 7px 0;"></div></div><span>Escuro</span></div>
+                        <div class="theme-option" data-theme="ocean"><div class="theme-swatch" style="background:#1e293b;"><div style="position:absolute;bottom:0;right:0;width:50%;height:50%;background:#06b6d4;border-radius:0 0 7px 0;"></div></div><span>Oceano</span></div>
+                        <div class="theme-option" data-theme="forest"><div class="theme-swatch" style="background:#1a2e1a;"><div style="position:absolute;bottom:0;right:0;width:50%;height:50%;background:#22c55e;border-radius:0 0 7px 0;"></div></div><span>Floresta</span></div>
+                        <div class="theme-option" data-theme="violet"><div class="theme-swatch" style="background:#2a1f3d;"><div style="position:absolute;bottom:0;right:0;width:50%;height:50%;background:#8b5cf6;border-radius:0 0 7px 0;"></div></div><span>Violeta</span></div>
+                        <div class="theme-option" data-theme="midnight"><div class="theme-swatch" style="background:#030712;"><div style="position:absolute;bottom:0;right:0;width:50%;height:50%;background:#3b82f6;border-radius:0 0 7px 0;"></div></div><span>Meia-noite</span></div>
+                        <div class="theme-option" data-theme="rose"><div class="theme-swatch" style="background:#fff1f2;"><div style="position:absolute;bottom:0;right:0;width:50%;height:50%;background:#e11d48;border-radius:0 0 7px 0;"></div></div><span>Rosé</span></div>
+                        <div class="theme-option" data-theme="sunset"><div class="theme-swatch" style="background:#2a1d18;"><div style="position:absolute;bottom:0;right:0;width:50%;height:50%;background:#f97316;border-radius:0 0 7px 0;"></div></div><span>Pôr do sol</span></div>
+                        <div class="theme-option" data-theme="aqua"><div class="theme-swatch" style="background:#ecfeff;"><div style="position:absolute;bottom:0;right:0;width:50%;height:50%;background:#14b8a6;border-radius:0 0 7px 0;"></div></div><span>Aqua</span></div>
                     </div>
                 </div>
                 <div style="padding-top:12px; border-top:1px solid var(--border-color); margin-bottom:16px;">
@@ -911,6 +953,6 @@
     var db = firebase.firestore();
     var githubProvider = new firebase.auth.GithubAuthProvider();
     </script>
-    <script src="logic.js?v=6.6"></script>
+    <script src="logic.js?v=7.0"></script>
 </body>
 </html>

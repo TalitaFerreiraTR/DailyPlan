@@ -233,10 +233,8 @@ function openUrlInNewTab(url) { if (!url) return; if (typeof chrome !== 'undefin
 
 // FUNÇÕES DE INICIALIZAÇÃO
 function init() {
-    var savedTheme = localStorage.getItem('psaiTheme');
-    var deadlineEl = getEl('input-deadline');
-    if (savedTheme === 'light') { document.body.classList.remove('dark-mode'); if (deadlineEl) deadlineEl.style.colorScheme = 'light'; }
-    else { document.body.classList.add('dark-mode'); localStorage.setItem('psaiTheme', 'dark'); if (deadlineEl) deadlineEl.style.colorScheme = 'dark'; }
+    var savedTheme = localStorage.getItem('psaiTheme') || 'dark';
+    applyTheme(savedTheme);
 
     function loadFromStorage() {
         storageGet(['myCasesV14', 'generalNotesList', 'myGroupsV1'], function(result) {
@@ -585,6 +583,55 @@ function statusForCase(c) {
     if (wt === 'NE') return c.neStatus || c.status || '';
     return c.status || '';
 }
+var selectMode = false;
+var selectedCaseIds = {};
+function enterSelectMode() {
+    selectMode = true;
+    selectedCaseIds = {};
+    document.body.classList.add('bulk-select-mode');
+    var bar = getEl('select-mode-bar');
+    if (bar) bar.classList.add('visible');
+    updateSelectCount();
+    renderSidebar();
+}
+function exitSelectMode() {
+    selectMode = false;
+    selectedCaseIds = {};
+    document.body.classList.remove('bulk-select-mode');
+    var bar = getEl('select-mode-bar');
+    if (bar) bar.classList.remove('visible');
+    var sa = getEl('select-all-check');
+    if (sa) sa.checked = false;
+    renderSidebar();
+}
+function updateSelectCount() {
+    var count = Object.keys(selectedCaseIds).length;
+    var el = getEl('select-count');
+    if (el) el.textContent = count + ' selecionado(s)';
+    var btn = getEl('btn-delete-selected');
+    if (btn) btn.disabled = count === 0;
+}
+function toggleCaseSelect(id) {
+    if (selectedCaseIds[id]) delete selectedCaseIds[id];
+    else selectedCaseIds[id] = true;
+    updateSelectCount();
+}
+function deleteSelectedCases() {
+    var ids = Object.keys(selectedCaseIds).map(Number);
+    if (ids.length === 0) { alert('Nenhuma análise selecionada.'); return; }
+    if (!confirm('Excluir ' + ids.length + ' análise(s) permanentemente?')) return;
+    cases = cases.filter(function(c) { return ids.indexOf(c.id) === -1; });
+    groups.forEach(function(g) { if (g.caseIds) g.caseIds = g.caseIds.filter(function(cid) { return ids.indexOf(cid) === -1; }); });
+    saveData();
+    saveGroups();
+    exitSelectMode();
+    var contentArea = getEl('content-area');
+    var emptyState = getEl('empty-state');
+    if (contentArea) contentArea.classList.remove('content-area-visible');
+    if (emptyState) emptyState.classList.remove('hidden');
+    currentId = null;
+    renderSidebar();
+}
 function renderSidebar() {
     var list = getEl('case-list'); if (!list) return; list.innerHTML = '';
     var filtered = workTypeFilter === 'all' ? cases : cases.filter(function(c) { return (c.workType || 'PSAI') === workTypeFilter; });
@@ -626,8 +673,16 @@ function renderSidebar() {
         var displayId = getCaseDisplayId(c);
         var tipoLabel = ((isConcluido || isPrescrita) && (c.caseType || '').trim()) ? ' <span class="case-item-tipo" style="font-size:10px; color:var(--text-secondary);"> · ' + escapeHtml((c.caseType || '').trim()) + '</span>' : '';
         item.className = 'case-item ' + barClass + ' ' + (c.id === currentId ? 'active' : '');
-        item.innerHTML = '<div class="case-item-body"><div class="case-item-id">' + escapeHtml(displayId) + '</div><div class="case-item-desc">' + escapeHtml(desc) + tipoLabel + '</div></div><span class="case-item-tag ' + tagClass + '">' + escapeHtml(tagText) + '</span>';
-        item.addEventListener('click', function() { loadCase(c.id); });
+        var checkHtml = '<input type="checkbox" class="select-check" data-case-id="' + c.id + '"' + (selectedCaseIds[c.id] ? ' checked' : '') + '>';
+        item.innerHTML = checkHtml + '<div class="case-item-body"><div class="case-item-id">' + escapeHtml(displayId) + '</div><div class="case-item-desc">' + escapeHtml(desc) + tipoLabel + '</div></div><span class="case-item-tag ' + tagClass + '">' + escapeHtml(tagText) + '</span>';
+        (function(caseId) {
+            var cb = item.querySelector('.select-check');
+            if (cb) cb.addEventListener('click', function(e) { e.stopPropagation(); toggleCaseSelect(caseId); });
+            item.addEventListener('click', function() {
+                if (selectMode) { toggleCaseSelect(caseId); if (cb) cb.checked = !!selectedCaseIds[caseId]; }
+                else loadCase(caseId);
+            });
+        })(c.id);
         list.appendChild(item);
     });
     renderGroupsList();
@@ -2102,13 +2157,24 @@ function saveSelection(activeEl) { var el = activeEl || document.activeElement; 
 function restoreSelection() { if (savedFocusElement && savedFocusElement.focus) savedFocusElement.focus(); if (savedRange) { var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(savedRange); } }
 function formatDoc(cmd, value = null) { document.execCommand('styleWithCSS', false, true); document.execCommand(cmd, false, value); saveSelection(); }
 function buildColorPalette(container, command) { var colors = ['#000000', '#FFFFFF', '#EF4444', '#10B981', '#3B82F6', '#F59E0B', '#8B5CF6']; container.innerHTML = ''; colors.forEach(function(color) { var div = document.createElement('div'); div.className = 'color-swatch'; div.style.backgroundColor = color; div.addEventListener('mousedown', function(e) { e.preventDefault(); e.stopPropagation(); restoreSelection(); formatDoc(command, color); container.style.display = 'none'; }); container.appendChild(div); }); container.style.display = 'grid'; }
-function toggleTheme(theme) {
-    var isDark = theme === 'dark' || (theme !== 'light' && document.body.classList.contains('dark-mode'));
-    document.body.classList.toggle('dark-mode', isDark);
+var ALL_THEMES = ['light', 'dark', 'ocean', 'forest', 'violet', 'midnight', 'rose', 'sunset', 'aqua'];
+var DARK_THEMES = ['dark', 'ocean', 'forest', 'violet', 'midnight', 'sunset'];
+function applyTheme(theme) {
+    if (ALL_THEMES.indexOf(theme) === -1) theme = 'dark';
+    document.body.classList.remove('dark-mode', 'theme-ocean', 'theme-forest', 'theme-violet', 'theme-midnight', 'theme-rose', 'theme-sunset', 'theme-aqua');
+    if (theme === 'dark') document.body.classList.add('dark-mode');
+    else if (theme !== 'light') document.body.classList.add('theme-' + theme);
+    var isDark = DARK_THEMES.indexOf(theme) !== -1;
     var deadlineEl = getEl('input-deadline');
     if (deadlineEl) deadlineEl.style.colorScheme = isDark ? 'dark' : 'light';
-    localStorage.setItem('psaiTheme', isDark ? 'dark' : 'light');
+    localStorage.setItem('psaiTheme', theme);
+    var grid = getEl('theme-grid');
+    if (grid) {
+        var opts = grid.querySelectorAll('.theme-option');
+        opts.forEach(function(o) { o.classList.toggle('active', o.getAttribute('data-theme') === theme); });
+    }
 }
+function toggleTheme(theme) { applyTheme(theme); }
 function openSettingsModal() {
     var devArea = getEl('settings-developer-area');
     var pwdArea = getEl('settings-password-area');
@@ -2117,10 +2183,11 @@ function openSettingsModal() {
     var backupUserEl = getEl('settings-backup-user');
     if (backupUserEl) backupUserEl.value = getBackupUserName();
     var theme = localStorage.getItem('psaiTheme') || 'dark';
-    var lightBtn = getEl('settings-theme-light');
-    var darkBtn = getEl('settings-theme-dark');
-    if (lightBtn) { lightBtn.classList.toggle('btn-primary', theme === 'light'); lightBtn.classList.toggle('btn-secondary', theme !== 'light'); }
-    if (darkBtn) { darkBtn.classList.toggle('btn-primary', theme === 'dark'); darkBtn.classList.toggle('btn-secondary', theme !== 'dark'); }
+    var grid = getEl('theme-grid');
+    if (grid) {
+        var opts = grid.querySelectorAll('.theme-option');
+        opts.forEach(function(o) { o.classList.toggle('active', o.getAttribute('data-theme') === theme); });
+    }
     openSettingsModalReminder();
     toggleModal('modal-settings', true);
 }
@@ -2434,6 +2501,29 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     (function setFilterActive() { document.querySelectorAll('.filter-chip').forEach(function(b) { b.classList.toggle('active', b.getAttribute('data-filter') === workTypeFilter); }); })();
 
+    var themeGrid = getEl('theme-grid');
+    if (themeGrid) {
+        themeGrid.addEventListener('click', function(e) {
+            var opt = e.target.closest('.theme-option');
+            if (!opt) return;
+            var t = opt.getAttribute('data-theme');
+            if (t) applyTheme(t);
+        });
+    }
+    var selectAllCheck = getEl('select-all-check');
+    if (selectAllCheck) {
+        selectAllCheck.addEventListener('change', function() {
+            var filtered = workTypeFilter === 'all' ? cases : cases.filter(function(c) { return (c.workType || 'PSAI') === workTypeFilter; });
+            if (selectAllCheck.checked) {
+                filtered.forEach(function(c) { selectedCaseIds[c.id] = true; });
+            } else {
+                selectedCaseIds = {};
+            }
+            updateSelectCount();
+            renderSidebar();
+        });
+    }
+
     const actions = {
         'close-notes': () => toggleModal('modal-notes', false),
         'btn-calendar': openCalendar, 'close-calendar': () => toggleModal('modal-calendar', false),
@@ -2444,8 +2534,9 @@ document.addEventListener('DOMContentLoaded', function() {
         'theme-toggle': openSettingsModal, 'add-btn': addNewCase,
         'close-settings': () => toggleModal('modal-settings', false),
         'btn-save-reminder': saveReminderSettings,
-        'settings-theme-light': function() { toggleTheme('light'); var l = getEl('settings-theme-light'); var d = getEl('settings-theme-dark'); if (l) { l.classList.add('btn-primary'); l.classList.remove('btn-secondary'); } if (d) { d.classList.remove('btn-primary'); d.classList.add('btn-secondary'); } },
-        'settings-theme-dark': function() { toggleTheme('dark'); var l = getEl('settings-theme-light'); var d = getEl('settings-theme-dark'); if (d) { d.classList.add('btn-primary'); d.classList.remove('btn-secondary'); } if (l) { l.classList.remove('btn-primary'); l.classList.add('btn-secondary'); } },
+        'btn-select-mode': enterSelectMode,
+        'btn-cancel-select': exitSelectMode,
+        'btn-delete-selected': deleteSelectedCases,
         'btn-users-from-settings': function() { },
         'btn-change-password': function() { },
         'close-change-password': function() { },
