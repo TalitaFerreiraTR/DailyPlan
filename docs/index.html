@@ -148,9 +148,8 @@
         .new-version-banner .new-version-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
         .empty-state-title { font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 16px; }
         .work-type-buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px; }
-        .work-type-btn { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 20px 24px; border: 2px solid var(--border-color); border-radius: 8px; background: var(--bg-card); color: var(--text-primary); cursor: pointer; transition: 0.2s; min-width: 100px; }
-        .work-type-btn:hover { border-color: var(--tr-orange); background: rgba(255,128,0,0.08); color: var(--tr-orange); }
-        .work-type-btn .wt-icon { font-size: 28px; }
+        .work-type-btn { display: flex; align-items: center; justify-content: center; padding: 10px 20px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-card); color: var(--text-primary); cursor: pointer; transition: 0.2s; font-size: 13px; font-weight: 600; min-width: 64px; }
+        .work-type-btn:hover { border-color: var(--tr-orange); color: var(--tr-orange); }
         .empty-state-hint { font-size: 12px; color: var(--text-secondary); }
         .section-hint { font-size: 11px; color: var(--text-secondary); margin: 0; }
         .panel-general { display: none; flex-direction: column; gap: 20px; padding-bottom: 50px; }
@@ -453,11 +452,11 @@
             <div class="empty-state-choice">
                 <p class="empty-state-title">O que você vai trabalhar?</p>
                 <div class="work-type-buttons">
-                    <button type="button" class="work-type-btn" data-type="all"><span class="wt-icon"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:24px;height:24px;"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M12 11h4M12 16h4M8 11h.01M8 16h.01"/></svg></span><span>Todos</span></button>
-                    <button type="button" class="work-type-btn" data-type="PSAI"><span class="wt-icon"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:24px;height:24px;"><path d="M4 17l6-6-6-6"/><path d="M12 19h8"/></svg></span><span>PSAI</span></button>
-                    <button type="button" class="work-type-btn" data-type="SS"><span class="wt-icon"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:24px;height:24px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></span><span>SS</span></button>
-                    <button type="button" class="work-type-btn" data-type="SAI"><span class="wt-icon"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:24px;height:24px;"><path d="M12 2v6l4 2 4 8H4l4-8 4-2V2z"/></svg></span><span>SAI</span></button>
-                    <button type="button" class="work-type-btn" data-type="NE"><span class="wt-icon"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:24px;height:24px;"><path d="M4 6h16M4 12h16M4 18h16"/></svg></span><span>NE</span></button>
+                    <button type="button" class="work-type-btn" data-type="all"><span>Todos</span></button>
+                    <button type="button" class="work-type-btn" data-type="PSAI"><span>PSAI</span></button>
+                    <button type="button" class="work-type-btn" data-type="SS"><span>SS</span></button>
+                    <button type="button" class="work-type-btn" data-type="SAI"><span>SAI</span></button>
+                    <button type="button" class="work-type-btn" data-type="NE"><span>NE</span></button>
                 </div>
                 <p class="empty-state-hint">Ou selecione uma análise na lista ao lado.</p>
             </div>
@@ -949,6 +948,6 @@
     var db = firebase.firestore();
     var githubProvider = new firebase.auth.GithubAuthProvider();
     </script>
-    <script src="logic.js?v=7.1"></script>
+    <script src="logic.js?v=7.2"></script>
 </body>
 </html>
