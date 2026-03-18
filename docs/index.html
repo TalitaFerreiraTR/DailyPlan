@@ -326,6 +326,11 @@
         .summary-sa-line { display: flex; align-items: flex-start; gap: 6px; font-size: 12px; line-height: 1.4; margin-bottom: 6px; color: var(--text-primary); }
         .summary-sa-line .summary-sa-text { flex: 1; }
         .remove-sa-btn { flex-shrink: 0; background: transparent; border: 1px solid var(--border-color); color: var(--danger); width: 22px; height: 22px; border-radius: 4px; cursor: pointer; font-size: 11px; padding: 0; }
+        .ss-tree { margin-left: 16px; padding-left: 8px; border-left: 1px solid var(--border-color); margin-top: 2px; margin-bottom: 8px; }
+        .ss-tree-item { font-size: 11px; color: var(--text-secondary); line-height: 1.5; padding: 1px 0; }
+        .ss-tree-item .summary-sa-link { font-size: 11px; }
+        .ss-tree-icon { color: var(--border-color); font-family: monospace; margin-right: 4px; }
+        .ssc-indent { margin-left: 20px; }
         .remove-sa-btn:hover { background: var(--danger); color: white; }
         .add-sa-form { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color); }
         .add-sa-label { display: block; font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; text-transform: uppercase; }
@@ -948,6 +953,6 @@
     var db = firebase.firestore();
     var githubProvider = new firebase.auth.GithubAuthProvider();
     </script>
-    <script src="logic.js?v=7.2"></script>
+    <script src="logic.js?v=7.3"></script>
 </body>
 </html>

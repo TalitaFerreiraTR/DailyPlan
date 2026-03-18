@@ -1915,6 +1915,22 @@ function analyzeData(id) {
         allLinks.forEach((link, idx) => {
             const desc = (link.desc || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             html += `<div class="summary-sa-line"><span class="summary-sa-text">${saLinkHtml(link)}: ${desc}</span><button type="button" class="remove-sa-btn" data-index="${idx}" title="Excluir">X</button></div>`;
+            if (link.ssLinks && link.ssLinks.length > 0) {
+                html += `<div class="ss-tree">`;
+                link.ssLinks.forEach(function(ss) {
+                    const ssDesc = (ss.assunto || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    html += `<div class="ss-tree-item"><span class="ss-tree-icon">└─</span> ${saLinkHtml(ss)}${ssDesc ? ': ' + ssDesc : ''}</div>`;
+                    if (ss.sscs && ss.sscs.length > 0) {
+                        ss.sscs.forEach(function(ssc) {
+                            const sscCode = (ssc.code || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                            const sscLink = (ssc.link || '').trim();
+                            const sscHtml = sscLink ? `<a href="${sscLink.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}" target="_blank" rel="noopener" class="summary-sa-link">SSC ${sscCode}</a>` : `SSC ${sscCode}`;
+                            html += `<div class="ss-tree-item ssc-indent"><span class="ss-tree-icon">└─</span> ${sscHtml}</div>`;
+                        });
+                    }
+                });
+                html += `</div>`;
+            }
         });
         html += `</div></div>`;
     }

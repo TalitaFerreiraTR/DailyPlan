@@ -84,9 +84,71 @@
             if (matchSAs && matchSAs[1]) {
                 const numbers = matchSAs[1].split(',').map(n => n.trim()).filter(n => n.length > 0);
                 const uniqueNumbers = [...new Set(numbers)];
+
+                function extractSSFromSADoc(doc) {
+                    const ssNums = new Set();
+                    doc.querySelectorAll('a[href*="ss.html"]').forEach(a => {
+                        const m = (a.getAttribute('href') || '').match(/[?&]ss=(\d+)/);
+                        if (m) ssNums.add(m[1]);
+                    });
+                    doc.querySelectorAll('a[href*="ss="]').forEach(a => {
+                        const href = a.getAttribute('href') || '';
+                        if (href.indexOf('ssc=') !== -1) return;
+                        const m = href.match(/[?&]ss=(\d+)/);
+                        if (m) ssNums.add(m[1]);
+                    });
+                    const bodyText = doc.body ? doc.body.innerText : '';
+                    const mText = bodyText.match(/SS(?:\(s\))?:\s*([0-9,\s]+)/i);
+                    if (mText) mText[1].split(',').map(n => n.trim()).filter(n => n).forEach(n => ssNums.add(n));
+                    return [...ssNums];
+                }
+
+                async function fetchSSDetails(ssNum) {
+                    const url = `https://sgd.dominiosistemas.com.br/sgsa/faces/ss.html?ss=${ssNum}`;
+                    try {
+                        const resp = await fetch(url);
+                        const text = await resp.text();
+                        const doc = new DOMParser().parseFromString(text, 'text/html');
+                        let assunto = '';
+                        const destaque = doc.querySelectorAll('td.tableVisualizacaoDestaque');
+                        const htmlCells = doc.querySelectorAll('td.tableVisualizacaoHtml');
+                        for (let i = 0; i < destaque.length; i++) {
+                            if ((destaque[i].innerText || '').indexOf('Assunto:') !== -1 && htmlCells[i]) {
+                                assunto = (htmlCells[i].innerText || '').trim();
+                                break;
+                            }
+                        }
+                        if (!assunto) {
+                            const rows = doc.querySelectorAll('tr');
+                            for (let r = 0; r < rows.length; r++) {
+                                if ((rows[r].innerText || '').indexOf('Assunto:') !== -1 && rows[r + 1]) {
+                                    const cell = rows[r + 1].querySelector('td.tableVisualizacaoHtml');
+                                    if (cell) { assunto = (cell.innerText || '').trim(); break; }
+                                }
+                            }
+                        }
+                        let sscs = [];
+                        const rows = doc.querySelectorAll('tr');
+                        for (let r = 0; r < rows.length; r++) {
+                            if ((rows[r].innerText || '').indexOf('SSC(s):') !== -1) {
+                                rows[r].querySelectorAll('a[href*="ssc="]').forEach(a => {
+                                    const href = a.getAttribute('href') || '';
+                                    const code = (a.innerText || '').trim() || ((href.match(/ssc=(\d+)/) || [])[1] || '');
+                                    if (code) sscs.push({ code: String(code).trim(), link: a.href || '' });
+                                });
+                                break;
+                            }
+                        }
+                        return { code: `SS ${ssNum}`, link: url, assunto: assunto.replace(/\s+/g, ' ').substring(0, 300), sscs: sscs };
+                    } catch (e) {
+                        return { code: `SS ${ssNum}`, link: url, assunto: 'Erro ao acessar', sscs: [] };
+                    }
+                }
+
                 for (const num of uniqueNumbers) {
                     const url = `https://sgd.dominiosistemas.com.br/sgsa/faces/sa.html?sa=${num}`;
-                    let desc = "Carregando...";
+                    let desc = '';
+                    let ssLinks = [];
                     try {
                         const resp = await fetch(url);
                         const text = await resp.text();
@@ -97,11 +159,17 @@
                         else {
                             const tds = Array.from(doc.querySelectorAll('td'));
                             const ld = tds.find(t => t.innerText.includes('Descrição:'));
-                            if(ld && ld.parentElement) desc = ld.parentElement.innerText.replace('Descrição:', '').trim();
+                            if (ld && ld.parentElement) desc = ld.parentElement.innerText.replace('Descrição:', '').trim();
                         }
-                    } catch (e) { desc = "Erro acesso"; }
+                        const ssNums = extractSSFromSADoc(doc);
+                        for (const ssN of ssNums) {
+                            if(txtSpan) txtSpan.innerText = `SA ${num} → SS ${ssN}...`;
+                            ssLinks.push(await fetchSSDetails(ssN));
+                        }
+                    } catch (e) { desc = 'Erro acesso'; }
                     desc = desc.replace(/\s+/g, ' ');
-                    saLinks.push({ code: `SA ${num}`, link: url, desc: desc });
+                    saLinks.push({ code: `SA ${num}`, link: url, desc: desc, ssLinks: ssLinks });
+                    if(txtSpan) txtSpan.innerText = `Lendo SA ${uniqueNumbers.indexOf(num) + 1}/${uniqueNumbers.length}...`;
                 }
             }
 
@@ -116,7 +184,12 @@
                 };
                 cases.push(newCase);
                 chrome.storage.local.set({ 'myCasesV14': JSON.stringify(cases) }, function() {
-                    alert(`✅ Captura OK!\nTipo: ${tipoCapturado}\nSAs: ${saLinks.length}`);
+                    const totalSS = saLinks.reduce((s, sa) => s + (sa.ssLinks ? sa.ssLinks.length : 0), 0);
+                    const totalSSC = saLinks.reduce((s, sa) => s + (sa.ssLinks || []).reduce((s2, ss) => s2 + (ss.sscs ? ss.sscs.length : 0), 0), 0);
+                    let msg = `✅ Captura OK!\nTipo: ${tipoCapturado}\nSAs: ${saLinks.length}`;
+                    if (totalSS > 0) msg += `\nSSs vinculadas: ${totalSS}`;
+                    if (totalSSC > 0) msg += `\nSSCs vinculadas: ${totalSSC}`;
+                    alert(msg);
                     if(txtSpan) txtSpan.innerText = 'LER SAs';
                     if(!btn.matches(':hover')) btn.onmouseleave();
                 });
