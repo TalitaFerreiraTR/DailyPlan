@@ -2452,18 +2452,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         }, 'btn-set-backup-folder': setBackupFolder, 'btn-restore': function() { var fi = getEl('file-input'); if (fi) fi.click(); },
-        'settings-btn-backup': function() {
-            writeBackupToFolder().then(function(ok) {
-                if (ok) alert('Backup gravado na pasta definida.');
-                else {
-                    getBackupDirHandle().then(function(handle) {
-                        if (!handle) alert('Pasta não definida. Clique em "Pasta backup" e escolha a pasta. O backup foi baixado.');
-                        else alert('Permissão negada ou erro ao gravar. Escolha a pasta novamente. O backup foi baixado.');
-                        exportData();
-                    }).catch(function() { exportData(); });
-                }
-            });
-        },
+        'settings-btn-backup': function() { exportData(); },
         'settings-btn-restore': function() { var fi = getEl('file-input'); if (fi) fi.click(); },
         'settings-btn-set-backup-folder': setBackupFolder,
         'btn-go': openPsaiLink, 
@@ -2482,7 +2471,8 @@ document.addEventListener('DOMContentLoaded', function() {
             toggleModal('modal-ler-ss', false);
         },
         'btn-ler-ss-aba': function() {
-            if (typeof chrome === 'undefined' || !chrome.tabs || !chrome.runtime) {
+            var hasExtension = (typeof chrome !== 'undefined' && chrome.tabs && chrome.runtime && chrome.runtime.id);
+            if (!hasExtension) {
                 setVal('ss-html-paste', ''); toggleModal('modal-ler-ss', true);
                 return;
             }
