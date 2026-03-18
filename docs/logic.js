@@ -13,6 +13,8 @@ var currentUser = null; // { username, role: 'normal'|'gerente'|'desenvolvedor' 
 var APP_VERSION = '6.0';
 var firebaseUid = null;
 var _firestoreSaveTimer = null;
+var _firestorePendingData = {};
+var SYNC_KEYS = ['myCasesV14', 'generalNotesList', 'myGroupsV1'];
 
 // --- STORAGE: localStorage como cache rapido + Firestore como persistencia ---
 function storageGet(keys, callback) {
@@ -31,19 +33,25 @@ function storageRemove(keys, callback) {
 }
 function _syncToFirestore(obj) {
     if (!firebaseUid || typeof db === 'undefined') return;
+    Object.keys(obj).forEach(function(k) { _firestorePendingData[k] = obj[k]; });
     clearTimeout(_firestoreSaveTimer);
-    _firestoreSaveTimer = setTimeout(function() {
-        var update = { lastUpdated: firebase.firestore.FieldValue.serverTimestamp() };
-        Object.keys(obj).forEach(function(k) { update[k] = obj[k]; });
-        db.collection('users').doc(firebaseUid).set(update, { merge: true }).catch(function(e) { console.warn('Firestore save error:', e); });
-    }, 2000);
+    _firestoreSaveTimer = setTimeout(_flushToFirestore, 2000);
 }
+function _flushToFirestore() {
+    if (!firebaseUid || typeof db === 'undefined' || Object.keys(_firestorePendingData).length === 0) return;
+    var update = { lastUpdated: firebase.firestore.FieldValue.serverTimestamp() };
+    Object.keys(_firestorePendingData).forEach(function(k) { update[k] = _firestorePendingData[k]; });
+    _firestorePendingData = {};
+    db.collection('users').doc(firebaseUid).set(update, { merge: true }).catch(function(e) { console.warn('Firestore save error:', e); });
+}
+window.addEventListener('beforeunload', _flushToFirestore);
+
 function _loadFromFirestore(callback) {
     if (!firebaseUid || typeof db === 'undefined') { if (callback) callback(); return; }
     db.collection('users').doc(firebaseUid).get().then(function(doc) {
         if (doc.exists) {
             var data = doc.data();
-            ['myCasesV14', 'generalNotesList', 'myGroupsV1'].forEach(function(k) {
+            SYNC_KEYS.forEach(function(k) {
                 if (data[k]) localStorage.setItem(k, data[k]);
             });
         }
