@@ -1911,6 +1911,8 @@ function setBackupDirHandle(handle) {
 function updateBackupFolderLabel(name) {
     var el = getEl('backup-folder-label');
     if (el) el.textContent = name ? 'Pasta: ' + name : '';
+    var el2 = getEl('settings-backup-folder-label');
+    if (el2) el2.textContent = name ? 'Pasta: ' + name : '';
 }
 
 function parseVersion(str) {
@@ -2450,6 +2452,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         }, 'btn-set-backup-folder': setBackupFolder, 'btn-restore': function() { var fi = getEl('file-input'); if (fi) fi.click(); },
+        'settings-btn-backup': function() {
+            writeBackupToFolder().then(function(ok) {
+                if (ok) alert('Backup gravado na pasta definida.');
+                else {
+                    getBackupDirHandle().then(function(handle) {
+                        if (!handle) alert('Pasta não definida. Clique em "Pasta backup" e escolha a pasta. O backup foi baixado.');
+                        else alert('Permissão negada ou erro ao gravar. Escolha a pasta novamente. O backup foi baixado.');
+                        exportData();
+                    }).catch(function() { exportData(); });
+                }
+            });
+        },
+        'settings-btn-restore': function() { var fi = getEl('file-input'); if (fi) fi.click(); },
+        'settings-btn-set-backup-folder': setBackupFolder,
         'btn-go': openPsaiLink, 
 'btn-add-sa': addSaFromForm,
         'btn-add-manager': () => addManagerReviewRow(),

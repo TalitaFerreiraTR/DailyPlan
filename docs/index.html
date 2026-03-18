@@ -409,12 +409,6 @@
         <div id="sidebar-footer">
             <div class="footer-main">
                 <button type="button" id="add-btn" class="btn-with-icon"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;"><path d="M12 5v14M5 12h14"/></svg> Nova Análise</button>
-                <div class="footer-links">
-                    <button type="button" class="footer-link" id="btn-backup" title="Backup Total (download)"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:12px;height:12px;vertical-align:-2px;margin-right:4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>Backup</button>
-                    <button type="button" class="footer-link" id="btn-set-backup-folder" title="Escolher pasta do OneDrive para backup automático"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:12px;height:12px;vertical-align:-2px;margin-right:4px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Pasta backup</button>
-                    <button type="button" class="footer-link" id="btn-restore" title="Importar backup"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:12px;height:12px;vertical-align:-2px;margin-right:4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>Importar</button>
-                </div>
-                <p class="backup-auto-hint" style="margin:6px 0 0; font-size:10px; color:var(--text-secondary);">Com a pasta definida, todos os salvamentos geram backup automático nela. <span id="backup-folder-label" class="backup-folder-label"></span></p>
                 <input type="file" id="file-input" accept=".json,application/json" style="display:none">
             </div>
         </div>
@@ -816,6 +810,17 @@
                         <button type="button" class="btn-secondary btn-action" id="settings-theme-light" data-theme="light" style="flex:1;">Claro</button>
                         <button type="button" class="btn-secondary btn-action" id="settings-theme-dark" data-theme="dark" style="flex:1;">Escuro</button>
                     </div>
+                </div>
+                <div style="padding-top:12px; border-top:1px solid var(--border-color); margin-bottom:16px;">
+                    <label style="display:block; margin-bottom:6px; font-size:11px; text-transform:uppercase; color:var(--text-secondary);">Backup e Importação</label>
+                    <div style="display:flex; gap:8px; margin-bottom:8px;">
+                        <button type="button" class="btn-secondary btn-action" id="settings-btn-backup" style="flex:1; font-size:11px;"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:12px;height:12px;vertical-align:-2px;margin-right:4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>Backup</button>
+                        <button type="button" class="btn-secondary btn-action" id="settings-btn-restore" style="flex:1; font-size:11px;"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:12px;height:12px;vertical-align:-2px;margin-right:4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>Importar</button>
+                    </div>
+                    <div style="display:flex; gap:8px; margin-bottom:4px;">
+                        <button type="button" class="btn-secondary btn-action" id="settings-btn-set-backup-folder" style="flex:1; font-size:11px;"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:12px;height:12px;vertical-align:-2px;margin-right:4px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Pasta backup</button>
+                    </div>
+                    <p class="section-hint" style="margin:4px 0 0;">Backup automático ao salvar. <span id="settings-backup-folder-label" class="backup-folder-label"></span></p>
                 </div>
                 <div style="padding-top:12px; border-top:1px solid var(--border-color); margin-bottom:16px;">
                     <label style="display:block; margin-bottom:6px; font-size:11px; text-transform:uppercase; color:var(--text-secondary);">Lembrete – copiar para anotações</label>
