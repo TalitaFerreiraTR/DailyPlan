@@ -39,22 +39,22 @@
                     'if(typeof groups!=="undefined")groups=g;' +
                     'if(typeof renderSidebar==="function")renderSidebar();' +
                     'if(typeof renderNotes==="function")renderNotes();' +
-                    'if(typeof _syncToFirestore==="function")_syncToFirestore({myCasesV14:localStorage.getItem("myCasesV14"),generalNotesList:localStorage.getItem("generalNotesList"),myGroupsV1:localStorage.getItem("myGroupsV1")});' +
-                    '}catch(e){}})();';
+                    'if(typeof _syncToFirestore==="function")_syncToFirestore({' +
+                    'myCasesV14:localStorage.getItem("myCasesV14"),' +
+                    'generalNotesList:localStorage.getItem("generalNotesList"),' +
+                    'myGroupsV1:localStorage.getItem("myGroupsV1")});' +
+                    '}catch(e){console.warn("DP sync error:",e)}})();';
                 (document.head || document.documentElement).appendChild(s);
                 s.remove();
             }
         });
     }
 
-    if (document.readyState === 'complete') {
-        setTimeout(mergeAndNotify, 1500);
-    } else {
-        window.addEventListener('load', function() { setTimeout(mergeAndNotify, 1500); });
-    }
+    window.addEventListener('load', function() { setTimeout(mergeAndNotify, 2000); });
 
-    chrome.storage.onChanged.addListener(function(changes) {
-        var relevant = SYNC_KEYS.some(function(k) { return !!changes[k]; });
-        if (relevant) setTimeout(mergeAndNotify, 500);
+    chrome.runtime.onMessage.addListener(function(msg) {
+        if (msg && msg.action === 'DP_SYNC_FROM_EXT') {
+            mergeAndNotify();
+        }
     });
 })();
