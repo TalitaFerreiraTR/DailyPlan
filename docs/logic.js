@@ -248,6 +248,11 @@ function init() {
         });
     }
     loadFromStorage();
+    window.addEventListener('message', function(e) {
+        if (e.data && e.data.type === 'DP_EXT_SYNC') {
+            loadFromStorage();
+        }
+    });
     window.addEventListener('storage', function(e) {
         if (e.key === 'myCasesV14' && e.newValue) { try { cases = JSON.parse(e.newValue); } catch (ex) {} renderSidebar(); }
         if (e.key === 'myGroupsV1' && e.newValue) { try { groups = JSON.parse(e.newValue); } catch (ex) {} renderSidebar(); renderGroupsList(); }

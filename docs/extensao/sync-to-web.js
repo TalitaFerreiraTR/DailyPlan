@@ -29,23 +29,7 @@
             });
 
             if (anyAdded) {
-                var s = document.createElement('script');
-                s.textContent = '(function(){try{' +
-                    'var c=JSON.parse(localStorage.getItem("myCasesV14")||"[]");' +
-                    'var n=JSON.parse(localStorage.getItem("generalNotesList")||"[]");' +
-                    'var g=JSON.parse(localStorage.getItem("myGroupsV1")||"[]");' +
-                    'if(typeof cases!=="undefined")cases=c;' +
-                    'if(typeof notes!=="undefined")notes=n;' +
-                    'if(typeof groups!=="undefined")groups=g;' +
-                    'if(typeof renderSidebar==="function")renderSidebar();' +
-                    'if(typeof renderNotes==="function")renderNotes();' +
-                    'if(typeof _syncToFirestore==="function")_syncToFirestore({' +
-                    'myCasesV14:localStorage.getItem("myCasesV14"),' +
-                    'generalNotesList:localStorage.getItem("generalNotesList"),' +
-                    'myGroupsV1:localStorage.getItem("myGroupsV1")});' +
-                    '}catch(e){console.warn("DP sync error:",e)}})();';
-                (document.head || document.documentElement).appendChild(s);
-                s.remove();
+                window.postMessage({ type: 'DP_EXT_SYNC' }, '*');
             }
         });
     }
@@ -53,8 +37,6 @@
     window.addEventListener('load', function() { setTimeout(mergeAndNotify, 2000); });
 
     chrome.runtime.onMessage.addListener(function(msg) {
-        if (msg && msg.action === 'DP_SYNC_FROM_EXT') {
-            mergeAndNotify();
-        }
+        if (msg && msg.action === 'DP_SYNC_FROM_EXT') mergeAndNotify();
     });
 })();
