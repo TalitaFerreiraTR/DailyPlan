@@ -2042,29 +2042,21 @@ function importData(input) {
         if (Array.isArray(data)) importedCases = data;
         else if (data && Array.isArray(data.cases)) importedCases = data.cases;
         importedCases.forEach(function(c) { if (!c.workType) c.workType = 'PSAI'; });
-        var existingTitles = {};
-        cases.forEach(function(c) { if (c.title) existingTitles[c.title] = true; });
         var addedCases = 0;
         importedCases.forEach(function(c) {
-            if (c.title && existingTitles[c.title]) return;
             c.id = Date.now() + Math.floor(Math.random() * 10000) + addedCases;
             cases.push(c);
-            if (c.title) existingTitles[c.title] = true;
             addedCases++;
         });
         var importedGroups = (data && Array.isArray(data.groups)) ? data.groups : [];
-        var existingGroupNames = {};
-        groups.forEach(function(g) { if (g.name) existingGroupNames[g.name] = true; });
         var addedGroups = 0;
         importedGroups.forEach(function(g) {
-            if (g.name && existingGroupNames[g.name]) return;
             g.id = Date.now() + Math.floor(Math.random() * 10000) + addedGroups + 5000;
             groups.push(g);
-            if (g.name) existingGroupNames[g.name] = true;
             addedGroups++;
         });
         if (addedCases === 0 && addedGroups === 0) {
-            alert('Nenhuma análise nova encontrada no arquivo. Todas já existem (mesmo título).');
+            alert('O arquivo não contém análises para importar.');
             input.value = '';
             return;
         }
