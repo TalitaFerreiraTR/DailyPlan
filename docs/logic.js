@@ -2031,12 +2031,22 @@ function importData(input) {
     reader.onload = function(e) {
         var data;
         try { data = JSON.parse(e.target.result); } catch (err) { alert('Arquivo JSON inválido.'); input.value = ''; return; }
-        if (Array.isArray(data)) cases = data;
-        else if (data && Array.isArray(data.cases)) cases = data.cases;
-        else cases = [];
-        cases.forEach(function(c) { if (!c.workType) c.workType = 'PSAI'; });
-        if (data && Array.isArray(data.groups)) groups = data.groups;
-        else groups = [];
+        var importedCases = [];
+        if (Array.isArray(data)) importedCases = data;
+        else if (data && Array.isArray(data.cases)) importedCases = data.cases;
+        importedCases.forEach(function(c) { if (!c.workType) c.workType = 'PSAI'; });
+        var existingIds = {};
+        cases.forEach(function(c) { if (c.id) existingIds[c.id] = true; });
+        var added = 0;
+        importedCases.forEach(function(c) {
+            if (c.id && !existingIds[c.id]) { cases.push(c); existingIds[c.id] = true; added++; }
+        });
+        var importedGroups = (data && Array.isArray(data.groups)) ? data.groups : [];
+        var existingGroupIds = {};
+        groups.forEach(function(g) { if (g.id) existingGroupIds[g.id] = true; });
+        importedGroups.forEach(function(g) {
+            if (g.id && !existingGroupIds[g.id]) { groups.push(g); existingGroupIds[g.id] = true; }
+        });
         var importPayload = { 'myCasesV14': JSON.stringify(cases), 'myGroupsV1': JSON.stringify(groups) };
         Object.keys(importPayload).forEach(function(k) { localStorage.setItem(k, importPayload[k]); });
         if (firebaseUid && typeof db !== 'undefined') {
