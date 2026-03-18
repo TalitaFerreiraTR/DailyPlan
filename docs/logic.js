@@ -2033,7 +2033,7 @@ function saveBackupToOneDrive() {
 }
 function importData(input) {
     var file = input && input.files && input.files[0];
-    if (!file) return;
+    if (!file) { alert('Nenhum arquivo selecionado.'); return; }
     var reader = new FileReader();
     reader.onload = function(e) {
         var data;
@@ -2044,18 +2044,26 @@ function importData(input) {
         importedCases.forEach(function(c) { if (!c.workType) c.workType = 'PSAI'; });
         var existingIds = {};
         cases.forEach(function(c) { if (c.id) existingIds[c.id] = true; });
-        var added = 0;
+        var addedCases = 0;
         importedCases.forEach(function(c) {
-            if (c.id && !existingIds[c.id]) { cases.push(c); existingIds[c.id] = true; added++; }
+            if (c.id && !existingIds[c.id]) { cases.push(c); existingIds[c.id] = true; addedCases++; }
         });
         var importedGroups = (data && Array.isArray(data.groups)) ? data.groups : [];
         var existingGroupIds = {};
         groups.forEach(function(g) { if (g.id) existingGroupIds[g.id] = true; });
+        var addedGroups = 0;
         importedGroups.forEach(function(g) {
-            if (g.id && !existingGroupIds[g.id]) { groups.push(g); existingGroupIds[g.id] = true; }
+            if (g.id && !existingGroupIds[g.id]) { groups.push(g); existingGroupIds[g.id] = true; addedGroups++; }
         });
+        if (addedCases === 0 && addedGroups === 0) {
+            alert('Nenhuma análise nova encontrada no arquivo. Todas já existem.');
+            input.value = '';
+            return;
+        }
         var importPayload = { 'myCasesV14': JSON.stringify(cases), 'myGroupsV1': JSON.stringify(groups) };
         Object.keys(importPayload).forEach(function(k) { localStorage.setItem(k, importPayload[k]); });
+        toggleModal('modal-settings', false);
+        alert('Importação concluída! ' + addedCases + ' análise(s) e ' + addedGroups + ' grupo(s) adicionados.');
         if (firebaseUid && typeof db !== 'undefined') {
             var update = { lastUpdated: firebase.firestore.FieldValue.serverTimestamp() };
             Object.keys(importPayload).forEach(function(k) { update[k] = importPayload[k]; });
