@@ -2073,7 +2073,9 @@ function importData(input) {
             addedGroups++;
         });
         if (addedCases === 0 && addedGroups === 0) {
-            alert('O arquivo não contém análises para importar.');
+            var debugKeys = data ? Object.keys(data).join(', ') : '(nenhuma)';
+            var debugType = Array.isArray(data) ? 'array[' + data.length + ']' : typeof data;
+            alert('O arquivo não contém análises para importar.\n\nDebug: tipo=' + debugType + '\nChaves: ' + debugKeys);
             input.value = '';
             return;
         }
