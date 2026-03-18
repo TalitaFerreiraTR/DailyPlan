@@ -2036,11 +2036,20 @@ function importData(input) {
     if (!file) { alert('Nenhum arquivo selecionado.'); return; }
     var reader = new FileReader();
     reader.onload = function(e) {
+        var raw = e.target.result;
         var data;
-        try { data = JSON.parse(e.target.result); } catch (err) { alert('Arquivo JSON inválido.'); input.value = ''; return; }
+        try { data = JSON.parse(raw); } catch (err) { alert('Arquivo JSON inválido.'); input.value = ''; return; }
         var importedCases = [];
-        if (Array.isArray(data)) importedCases = data;
-        else if (data && Array.isArray(data.cases)) importedCases = data.cases;
+        if (Array.isArray(data)) {
+            importedCases = data;
+        } else if (data && Array.isArray(data.cases)) {
+            importedCases = data.cases;
+        } else if (data && typeof data.myCasesV14 === 'string') {
+            try { importedCases = JSON.parse(data.myCasesV14); } catch (ex) {}
+        } else if (data && typeof data.cases === 'string') {
+            try { importedCases = JSON.parse(data.cases); } catch (ex) {}
+        }
+        if (!Array.isArray(importedCases)) importedCases = [];
         importedCases.forEach(function(c) { if (!c.workType) c.workType = 'PSAI'; });
         var addedCases = 0;
         importedCases.forEach(function(c) {
@@ -2048,7 +2057,15 @@ function importData(input) {
             cases.push(c);
             addedCases++;
         });
-        var importedGroups = (data && Array.isArray(data.groups)) ? data.groups : [];
+        var importedGroups = [];
+        if (data && Array.isArray(data.groups)) {
+            importedGroups = data.groups;
+        } else if (data && typeof data.myGroupsV1 === 'string') {
+            try { importedGroups = JSON.parse(data.myGroupsV1); } catch (ex) {}
+        } else if (data && typeof data.groups === 'string') {
+            try { importedGroups = JSON.parse(data.groups); } catch (ex) {}
+        }
+        if (!Array.isArray(importedGroups)) importedGroups = [];
         var addedGroups = 0;
         importedGroups.forEach(function(g) {
             g.id = Date.now() + Math.floor(Math.random() * 10000) + addedGroups + 5000;
