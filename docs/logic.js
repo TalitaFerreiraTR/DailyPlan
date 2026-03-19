@@ -744,68 +744,107 @@ function saveFolga() {
     }).then(function() { showToast('Folga lançada!'); loadFolgasTab(); });
 }
 
-// --- AUSENCIAS (gerente ve todas, usuario lanca as suas) ---
+// --- AUSENCIAS (gerente/admin ve todas e aprova/recusa) ---
+function _ausenciaStatusBadge(st) {
+    if (st === 'aprovada') return '<span class="ger-badge ger-badge-green">Aprovada</span>';
+    if (st === 'recusada') return '<span class="ger-badge" style="background:rgba(239,68,68,0.15);color:var(--danger);">Recusada</span>';
+    return '<span class="ger-badge" style="background:rgba(255,128,0,0.15);color:var(--tr-orange);">Pendente</span>';
+}
+
 function loadAusenciasTab() {
     var container = document.getElementById('gerente-tab-ausencias');
     if (!container) return;
     container.innerHTML = '<div class="ger-empty">Carregando...</div>';
-    db.collection('ausencias').orderBy('data', 'desc').get().then(function(snap) {
-        var items = [];
-        snap.forEach(function(doc) { items.push({ id: doc.id, data: doc.data() }); });
-        var html = '';
-        if (items.length === 0) html += '<div class="ger-empty">Nenhuma ausência registrada.</div>';
-        var hoje = new Date().toISOString().slice(0, 10);
-        items.forEach(function(a) {
-            var d = a.data;
-            var status = d.data >= hoje ? '<span class="ger-badge ger-badge-blue">Agendada</span>' : '<span class="ger-badge ger-badge-gray">Passada</span>';
-            html += '<div class="ger-card"><div class="ger-card-row">';
-            html += '<div><div class="ger-card-name">' + escapeHtml(d.userName || '') + '</div>';
-            html += '<div class="ger-card-meta">' + escapeHtml(d.data || '') + ' | ' + escapeHtml(d.tipo || 'Ausência') + '</div>';
-            if (d.motivo) html += '<div class="ger-card-meta" style="margin-top:2px;">' + escapeHtml(d.motivo) + '</div>';
-            html += '</div>';
-            html += '<div style="display:flex;gap:6px;align-items:center;">' + status;
-            html += ' <button type="button" class="ger-btn-danger" data-del-ausencia="' + a.id + '" title="Excluir">✕</button>';
-            html += '</div></div></div>';
+    db.collection('ausencias').orderBy('criadoEm', 'desc').get().then(function(snap) {
+        var pendentes = [], outras = [];
+        snap.forEach(function(doc) {
+            var item = { id: doc.id, data: doc.data() };
+            if ((item.data.status || 'pendente') === 'pendente') pendentes.push(item);
+            else outras.push(item);
         });
+        var html = '';
+        if (pendentes.length > 0) {
+            html += '<div style="font-size:11px;font-weight:600;color:var(--tr-orange);margin-bottom:6px;text-transform:uppercase;">Aguardando aprovação (' + pendentes.length + ')</div>';
+            pendentes.forEach(function(a) { html += _renderAusenciaGerente(a, true); });
+        }
+        if (outras.length > 0) {
+            html += '<div style="font-size:11px;font-weight:600;color:var(--text-secondary);margin:12px 0 6px;text-transform:uppercase;">Histórico</div>';
+            outras.forEach(function(a) { html += _renderAusenciaGerente(a, false); });
+        }
+        if (pendentes.length === 0 && outras.length === 0) html = '<div class="ger-empty">Nenhuma ausência registrada.</div>';
         container.innerHTML = html;
+
+        container.querySelectorAll('[data-aprovar]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                db.collection('ausencias').doc(btn.getAttribute('data-aprovar')).update({
+                    status: 'aprovada', aprovadoPor: currentUser ? currentUser.username : ''
+                }).then(function() { showToast('Aprovada!'); loadAusenciasTab(); });
+            });
+        });
+        container.querySelectorAll('[data-recusar]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                db.collection('ausencias').doc(btn.getAttribute('data-recusar')).update({
+                    status: 'recusada', aprovadoPor: currentUser ? currentUser.username : ''
+                }).then(function() { showToast('Recusada.'); loadAusenciasTab(); });
+            });
+        });
         container.querySelectorAll('[data-del-ausencia]').forEach(function(btn) {
             btn.addEventListener('click', function() {
                 if (!confirm('Excluir esta ausência?')) return;
-                db.collection('ausencias').doc(btn.getAttribute('data-del-ausencia')).delete().then(function() { loadAusenciasTab(); showToast('Ausência excluída!'); });
+                db.collection('ausencias').doc(btn.getAttribute('data-del-ausencia')).delete().then(function() { loadAusenciasTab(); showToast('Excluída!'); });
             });
         });
     });
 }
 
-// --- MINHAS AUSENCIAS (usuario lanca) ---
+function _renderAusenciaGerente(a, showActions) {
+    var d = a.data;
+    var html = '<div class="ger-card"><div class="ger-card-row">';
+    html += '<div style="flex:1;"><div class="ger-card-name">' + escapeHtml(d.userName || '') + '</div>';
+    html += '<div class="ger-card-meta">' + escapeHtml(d.data || '') + ' | ' + escapeHtml(d.tipo || 'Ausência') + (d.horario ? ' (' + escapeHtml(d.horario) + ')' : '') + '</div>';
+    if (d.motivo) html += '<div class="ger-card-meta" style="margin-top:2px;">' + escapeHtml(d.motivo) + '</div>';
+    html += '</div>';
+    html += '<div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;">';
+    if (showActions) {
+        html += '<button type="button" data-aprovar="' + a.id + '" style="background:var(--success);color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;">Aprovar</button>';
+        html += '<button type="button" data-recusar="' + a.id + '" style="background:var(--danger);color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;">Recusar</button>';
+    } else {
+        html += _ausenciaStatusBadge(d.status || 'pendente');
+    }
+    html += ' <button type="button" class="ger-btn-danger" data-del-ausencia="' + a.id + '" title="Excluir" style="padding:3px 6px;font-size:10px;">✕</button>';
+    html += '</div></div></div>';
+    return html;
+}
+
+// --- MINHAS AUSENCIAS (usuario solicita, gerente aprova) ---
 function loadMinhasAusencias() {
     var container = document.getElementById('minhas-ausencias-content');
     if (!container || !currentUser) return;
     container.innerHTML = '<div class="ger-empty">Carregando...</div>';
-    db.collection('ausencias').where('userId', '==', currentUser.uid).orderBy('data', 'desc').get().then(function(snap) {
+    db.collection('ausencias').where('userId', '==', currentUser.uid).orderBy('criadoEm', 'desc').get().then(function(snap) {
         var items = [];
         snap.forEach(function(doc) { items.push({ id: doc.id, data: doc.data() }); });
-        var html = '<div style="margin-bottom:12px;"><button type="button" class="ger-btn" id="btn-add-ausencia">+ Nova Ausência</button></div>';
+        var html = '<div style="margin-bottom:12px;"><button type="button" class="ger-btn" id="btn-add-ausencia">+ Solicitar Ausência</button></div>';
         html += '<div id="form-ausencia-container" style="display:none;"></div>';
-        if (items.length === 0) html += '<div class="ger-empty">Nenhuma ausência registrada.</div>';
-        var hoje = new Date().toISOString().slice(0, 10);
+        if (items.length === 0) html += '<div class="ger-empty">Nenhuma solicitação de ausência.</div>';
         items.forEach(function(a) {
             var d = a.data;
-            var status = d.data >= hoje ? '<span class="ger-badge ger-badge-blue">Agendada</span>' : '<span class="ger-badge ger-badge-gray">Passada</span>';
+            var st = d.status || 'pendente';
             html += '<div class="ger-card"><div class="ger-card-row">';
-            html += '<div><div class="ger-card-name">' + escapeHtml(d.tipo || 'Ausência') + ' — ' + escapeHtml(d.data || '') + '</div>';
+            html += '<div style="flex:1;"><div class="ger-card-name">' + escapeHtml(d.tipo || 'Ausência') + ' — ' + escapeHtml(d.data || '') + (d.horario ? ' (' + escapeHtml(d.horario) + ')' : '') + '</div>';
             if (d.motivo) html += '<div class="ger-card-meta">' + escapeHtml(d.motivo) + '</div>';
+            if (st !== 'pendente' && d.aprovadoPor) html += '<div class="ger-card-meta" style="margin-top:2px;">Por: ' + escapeHtml(d.aprovadoPor) + '</div>';
             html += '</div>';
-            html += '<div style="display:flex;gap:6px;align-items:center;">' + status;
-            html += ' <button type="button" class="ger-btn-danger" data-del-minha-ausencia="' + a.id + '" title="Excluir">✕</button>';
+            html += '<div style="display:flex;gap:6px;align-items:center;">' + _ausenciaStatusBadge(st);
+            if (st === 'pendente') html += ' <button type="button" class="ger-btn-danger" data-del-minha-ausencia="' + a.id + '" title="Cancelar" style="padding:3px 6px;font-size:10px;">✕</button>';
             html += '</div></div></div>';
         });
         container.innerHTML = html;
         document.getElementById('btn-add-ausencia').addEventListener('click', showAusenciaForm);
         container.querySelectorAll('[data-del-minha-ausencia]').forEach(function(btn) {
             btn.addEventListener('click', function() {
-                if (!confirm('Excluir esta ausência?')) return;
-                db.collection('ausencias').doc(btn.getAttribute('data-del-minha-ausencia')).delete().then(function() { loadMinhasAusencias(); showToast('Ausência excluída!'); });
+                if (!confirm('Cancelar esta solicitação?')) return;
+                db.collection('ausencias').doc(btn.getAttribute('data-del-minha-ausencia')).delete().then(function() { loadMinhasAusencias(); showToast('Solicitação cancelada!'); });
             });
         });
     });
@@ -820,7 +859,7 @@ function showAusenciaForm() {
         '<div><label>Data</label><input type="date" class="ger-input" id="ausencia-data" style="width:100%;"></div>' +
         '<div><label>Horário (opcional)</label><input type="text" class="ger-input" id="ausencia-horario" style="width:100%;" placeholder="Ex: 14h às 16h"></div>' +
         '<div><label>Motivo / Observação</label><input type="text" class="ger-input" id="ausencia-motivo" style="width:100%;" placeholder="Descreva o motivo"></div>' +
-        '<div style="display:flex;gap:6px;"><button type="button" class="ger-btn" id="btn-save-ausencia">Salvar</button><button type="button" class="ger-btn-sm" id="btn-cancel-ausencia">Cancelar</button></div>' +
+        '<div style="display:flex;gap:6px;"><button type="button" class="ger-btn" id="btn-save-ausencia">Solicitar</button><button type="button" class="ger-btn-sm" id="btn-cancel-ausencia">Cancelar</button></div>' +
         '</div>';
     document.getElementById('btn-save-ausencia').addEventListener('click', saveAusencia);
     document.getElementById('btn-cancel-ausencia').addEventListener('click', function() { container.style.display = 'none'; });
@@ -832,17 +871,17 @@ function saveAusencia() {
     var horario = document.getElementById('ausencia-horario').value.trim();
     var motivo = document.getElementById('ausencia-motivo').value.trim();
     if (!data) { alert('Informe a data.'); return; }
-    var descMotivo = tipo + (horario ? ' (' + horario + ')' : '') + (motivo ? ' — ' + motivo : '');
     db.collection('ausencias').add({
         userId: currentUser.uid,
         userName: currentUser.username || '',
         tipo: tipo,
         data: data,
         horario: horario,
-        motivo: descMotivo,
+        motivo: motivo,
+        status: 'pendente',
         criadoPor: currentUser.username || '',
         criadoEm: firebase.firestore.FieldValue.serverTimestamp()
-    }).then(function() { showToast('Ausência registrada!'); loadMinhasAusencias(); });
+    }).then(function() { showToast('Solicitação enviada! Aguarde aprovação.'); loadMinhasAusencias(); });
 }
 
 function loadFeriasEquipe() {
