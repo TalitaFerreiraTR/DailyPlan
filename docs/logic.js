@@ -10,6 +10,8 @@ let savedFocusElement = null;
 let autoSaveTimer = null;
 var currentUser = null; // { username, role: 'normal'|'gerente'|'desenvolvedor' }
 var adminViewMode = false;
+var adminViewUserEmail = '';
+var adminViewUserName = '';
 
 var APP_VERSION = '6.0';
 var firebaseUid = null;
@@ -176,6 +178,8 @@ function viewUserData(uid) {
         try { userGroups = JSON.parse(d.myGroupsV1 || '[]'); } catch (e) {}
         toggleModal('modal-admin', false);
         adminViewMode = true;
+        adminViewUserEmail = (d.email || '').trim();
+        adminViewUserName = (d.displayName || '').trim();
         cases = userCases;
         groups = userGroups;
         currentId = null;
@@ -184,8 +188,13 @@ function viewUserData(uid) {
         if (main) {
             var banner = document.createElement('div');
             banner.id = 'admin-view-banner';
-            banner.style.cssText = 'padding:10px 16px;background:rgba(255,128,0,0.15);border-bottom:1px solid var(--tr-orange);font-size:12px;color:var(--tr-orange);display:flex;align-items:center;justify-content:space-between;';
-            banner.innerHTML = '<span>Visualizando dados de <strong>' + escapeHtml(d.displayName || uid) + '</strong> (somente leitura)</span><button type="button" onclick="exitAdminView()" style="background:var(--tr-orange);color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:11px;">Voltar aos meus dados</button>';
+            banner.style.cssText = 'padding:10px 16px;background:rgba(255,128,0,0.15);border-bottom:1px solid var(--tr-orange);font-size:12px;color:var(--tr-orange);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;';
+            var bannerBtns = '<div style="display:flex;gap:6px;align-items:center;">';
+            if (adminViewUserEmail) {
+                bannerBtns += '<button type="button" onclick="contactOnTeams()" style="background:#505AC9;color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:11px;display:inline-flex;align-items:center;gap:4px;" title="Enviar mensagem no Teams"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#fff" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Teams</button>';
+            }
+            bannerBtns += '<button type="button" onclick="exitAdminView()" style="background:var(--tr-orange);color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:11px;">Voltar aos meus dados</button></div>';
+            banner.innerHTML = '<span>Visualizando dados de <strong>' + escapeHtml(d.displayName || uid) + '</strong> (somente leitura)</span>' + bannerBtns;
             var existing = document.getElementById('admin-view-banner');
             if (existing) existing.remove();
             main.prepend(banner);
@@ -195,6 +204,8 @@ function viewUserData(uid) {
 
 function exitAdminView() {
     adminViewMode = false;
+    adminViewUserEmail = '';
+    adminViewUserName = '';
     var banner = document.getElementById('admin-view-banner');
     if (banner) banner.remove();
     storageGet(['myCasesV14', 'generalNotesList', 'myGroupsV1'], function(result) {
@@ -205,6 +216,21 @@ function exitAdminView() {
         renderSidebar();
         renderGroupsList();
     });
+}
+function contactOnTeams() {
+    if (!adminViewUserEmail) { alert('Email do analista não disponível.'); return; }
+    var nome = adminViewUserName || 'analista';
+    var firstName = nome.split(' ')[0];
+    var analise = '';
+    if (currentId) {
+        var c = cases.find(function(x) { return x.id === currentId; });
+        if (c) analise = c.title || 'Sem título';
+    }
+    var msg = 'Olá ' + firstName + ', ';
+    if (analise) msg += 'estava observando sua análise ' + analise + ' e verifiquei que ';
+    else msg += 'estava observando suas análises e verifiquei que ';
+    var teamsUrl = 'https://teams.microsoft.com/l/chat/0/0?users=' + encodeURIComponent(adminViewUserEmail) + '&message=' + encodeURIComponent(msg);
+    window.open(teamsUrl, '_blank');
 }
 
 // --- UTILITÁRIOS GLOBAIS ---
