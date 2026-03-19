@@ -32,9 +32,9 @@
         #btn-github-login:hover { background:#1b1f23; transform:translateY(-1px); }
         #btn-github-login svg { width:20px; height:20px; fill:#fff; }
         #login-error { font-size:12px; color:var(--danger); margin-top:12px; min-height:16px; }
-        #user-bar { display:none; align-items:center; gap:8px; padding:8px 12px; border-bottom:1px solid var(--border-color); }
-        #user-bar img { width:28px; height:28px; border-radius:50%; }
-        #user-bar .user-name { font-size:12px; font-weight:600; color:var(--text-primary); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        #user-bar { display:none; align-items:center; gap:8px; padding:6px 12px; border-bottom:none; font-size:11px; }
+        #user-bar img { width:20px; height:20px; border-radius:50%; }
+        #user-bar .user-name { font-size:11px; font-weight:500; color:var(--text-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         #user-bar .user-role { font-size:10px; color:var(--text-secondary); }
         #btn-admin-panel { display:none; }
         .admin-user-item { display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--border-color); border-radius:6px; margin-bottom:6px; cursor:pointer; background:var(--bg-card); transition:0.2s; }
@@ -45,7 +45,7 @@
         @media (max-width: 800px) { body { width: 780px; height: 600px; } }
         
         #sidebar { width: 260px; background: var(--bg-sidebar); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; z-index: 10; flex-shrink: 0; }
-        #sidebar-header { padding: 12px 12px 10px 15px; border-bottom: none; display: flex; flex-direction: row; align-items: center; min-height: auto; }
+        #sidebar-header { padding: 10px 12px; border-bottom: 1px solid var(--border-color); display: flex; flex-direction: row; align-items: center; gap: 6px; min-height: auto; }
         #sidebar-header .tr-brand-area { flex: 1; min-width: 0; }
         .tr-logo-lockup { display: flex; align-items: center; gap: 8px; } .tr-kinesis-svg { width: 24px; height: 24px; fill: var(--tr-orange); flex-shrink: 0; } .tr-wordmark { font-size: 13px; font-weight: 700; color: var(--text-primary); line-height: 1.2; letter-spacing: -0.5px; white-space: nowrap; }
         #sidebar-icons { display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 6px; padding: 8px 12px 10px 15px; border-bottom: 1px solid var(--border-color); }
@@ -416,11 +416,13 @@
     <div id="sidebar">
         <div id="sidebar-header">
             <div class="tr-brand-area">
-                <div class="tr-logo-lockup" style="gap:0;">
-                    <span style="font-family:'Great Vibes',cursive;font-size:22px;color:var(--text-primary);line-height:1;">Daily</span>
-                    <span style="font-family:'Inter',sans-serif;font-size:13px;font-weight:700;color:var(--text-primary);letter-spacing:3px;text-transform:uppercase;margin-left:2px;">Plan</span>
+                <div class="tr-logo-lockup" style="gap:6px;">
+                    <span style="font-size:14px;font-weight:700;color:var(--text-primary);letter-spacing:0.5px;">DailyPlan</span>
                 </div>
             </div>
+            <button type="button" class="header-btn" id="btn-gerente-panel" title="Painel Gerente" style="display:none;"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg></button>
+            <button type="button" class="header-btn" id="btn-admin-panel" title="Painel Admin"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></button>
+            <button type="button" class="header-btn" id="btn-logout" title="Sair"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
         </div>
         <div id="user-bar">
             <img id="user-avatar" src="" alt="">
@@ -428,9 +430,6 @@
                 <div class="user-name" id="user-display-name"></div>
                 <div class="user-role" id="user-role-label"></div>
             </div>
-            <button type="button" class="header-btn" id="btn-gerente-panel" title="Painel Gerente" style="display:none;"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg></button>
-            <button type="button" class="header-btn" id="btn-admin-panel" title="Painel Admin"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></button>
-            <button type="button" class="header-btn" id="btn-logout" title="Sair"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
         </div>
         <div id="avisos-banner" style="display:none; padding:8px 12px; background:rgba(59,130,246,0.12); border-bottom:1px solid var(--active-blue); font-size:11px; color:var(--active-blue); cursor:pointer;" onclick="this.style.display='none';"></div>
         <div id="minha-meta-bar" style="display:none; padding:8px 12px; background:rgba(16,185,129,0.1); border-bottom:1px solid var(--success); font-size:11px; color:var(--success);"><strong>Minha meta:</strong> <span id="minha-meta-text"></span></div>
