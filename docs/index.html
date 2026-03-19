@@ -476,7 +476,10 @@
                     <button type="button" id="add-btn" class="btn-with-icon" style="flex:1;"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;"><path d="M12 5v14M5 12h14"/></svg> Nova Análise</button>
                     <button type="button" id="btn-select-mode" class="btn-with-icon" style="padding:12px;background:var(--bg-input);color:var(--text-secondary);border:1px solid var(--border-color);border-radius:6px;cursor:pointer;font-size:12px;" title="Selecionar para excluir"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:16px;height:16px;"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></button>
                 </div>
-                <button type="button" id="btn-ver-ferias" class="btn-with-icon" style="width:100%;padding:8px 12px;background:var(--bg-input);color:var(--text-secondary);border:1px solid var(--border-color);border-radius:6px;cursor:pointer;font-size:11px;" title="Férias da equipe"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Férias da Equipe</button>
+                <div style="display:flex;gap:6px;width:100%;">
+                    <button type="button" id="btn-ver-ferias" class="btn-with-icon" style="flex:1;padding:8px 8px;background:var(--bg-input);color:var(--text-secondary);border:1px solid var(--border-color);border-radius:6px;cursor:pointer;font-size:10px;" title="Férias e folgas da equipe"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:12px;height:12px;"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Equipe</button>
+                    <button type="button" id="btn-minhas-ausencias" class="btn-with-icon" style="flex:1;padding:8px 8px;background:var(--bg-input);color:var(--text-secondary);border:1px solid var(--border-color);border-radius:6px;cursor:pointer;font-size:10px;" title="Lançar consultas e ausências"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:12px;height:12px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Minhas Ausências</button>
+                </div>
                 <input type="file" id="file-input" accept=".dpbak,.json,application/json,application/octet-stream" style="display:none">
             </div>
         </div>
@@ -988,13 +991,29 @@
                 <button type="button" class="gerente-tab-btn active" data-tab="equipe" style="flex:1; padding:10px 0; background:none; border:none; border-bottom:2px solid var(--tr-orange); color:var(--text-primary); font-size:12px; font-weight:600; cursor:pointer;">Equipe</button>
                 <button type="button" class="gerente-tab-btn" data-tab="ferias" style="flex:1; padding:10px 0; background:none; border:none; border-bottom:2px solid transparent; color:var(--text-secondary); font-size:12px; font-weight:600; cursor:pointer;">Férias</button>
                 <button type="button" class="gerente-tab-btn" data-tab="metas" style="flex:1; padding:10px 0; background:none; border:none; border-bottom:2px solid transparent; color:var(--text-secondary); font-size:12px; font-weight:600; cursor:pointer;">Metas</button>
+                <button type="button" class="gerente-tab-btn" data-tab="folgas" style="flex:1; padding:10px 0; background:none; border:none; border-bottom:2px solid transparent; color:var(--text-secondary); font-size:12px; font-weight:600; cursor:pointer;">Folgas</button>
+                <button type="button" class="gerente-tab-btn" data-tab="ausencias" style="flex:1; padding:10px 0; background:none; border:none; border-bottom:2px solid transparent; color:var(--text-secondary); font-size:12px; font-weight:600; cursor:pointer;">Ausências</button>
                 <button type="button" class="gerente-tab-btn" data-tab="avisos" style="flex:1; padding:10px 0; background:none; border:none; border-bottom:2px solid transparent; color:var(--text-secondary); font-size:12px; font-weight:600; cursor:pointer;">Avisos</button>
             </div>
             <div class="modal-body" style="background:var(--bg-body); max-height:65vh; overflow-y:auto;">
                 <div id="gerente-tab-equipe" class="gerente-tab-content"></div>
                 <div id="gerente-tab-ferias" class="gerente-tab-content" style="display:none;"></div>
+                <div id="gerente-tab-folgas" class="gerente-tab-content" style="display:none;"></div>
+                <div id="gerente-tab-ausencias" class="gerente-tab-content" style="display:none;"></div>
                 <div id="gerente-tab-metas" class="gerente-tab-content" style="display:none;"></div>
                 <div id="gerente-tab-avisos" class="gerente-tab-content" style="display:none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-minhas-ausencias" class="modal">
+        <div class="modal-content" style="max-width:520px; width:95%;">
+            <div class="modal-header">
+                <strong><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;vertical-align:-2px;margin-right:6px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Minhas Ausências</strong>
+                <button class="header-btn" id="close-minhas-ausencias"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg></button>
+            </div>
+            <div class="modal-body" style="background:var(--bg-body); max-height:65vh; overflow-y:auto;">
+                <div id="minhas-ausencias-content"></div>
             </div>
         </div>
     </div>
@@ -1002,7 +1021,7 @@
     <div id="modal-ferias-equipe" class="modal">
         <div class="modal-content" style="max-width:520px; width:95%;">
             <div class="modal-header">
-                <strong><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;vertical-align:-2px;margin-right:6px;"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Férias da Equipe</strong>
+                <strong><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;vertical-align:-2px;margin-right:6px;"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Férias e Folgas da Equipe</strong>
                 <button class="header-btn" id="close-ferias-equipe"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg></button>
             </div>
             <div class="modal-body" style="background:var(--bg-body); max-height:60vh; overflow-y:auto;">
@@ -1028,6 +1047,6 @@
     var db = firebase.firestore();
     var githubProvider = new firebase.auth.GithubAuthProvider();
     </script>
-    <script src="logic.js?v=8.2"></script>
+    <script src="logic.js?v=8.3"></script>
 </body>
 </html>

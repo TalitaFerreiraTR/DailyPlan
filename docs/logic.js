@@ -670,25 +670,213 @@ function loadMinhaMetaBar() {
     }).catch(function() {});
 }
 
+// --- FOLGAS (gerente lanca) ---
+function loadFolgasTab() {
+    var container = document.getElementById('gerente-tab-folgas');
+    if (!container) return;
+    var isGerAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'gerente');
+    container.innerHTML = '<div class="ger-empty">Carregando...</div>';
+    db.collection('folgas').orderBy('data', 'desc').get().then(function(snap) {
+        var items = [];
+        snap.forEach(function(doc) { items.push({ id: doc.id, data: doc.data() }); });
+        var html = '';
+        if (isGerAdmin) {
+            html += '<div style="margin-bottom:12px;"><button type="button" class="ger-btn" id="btn-add-folga">+ Lançar Folga</button></div>';
+            html += '<div id="form-folga-container" style="display:none;"></div>';
+        }
+        if (items.length === 0) html += '<div class="ger-empty">Nenhuma folga registrada.</div>';
+        var hoje = new Date().toISOString().slice(0, 10);
+        items.forEach(function(f) {
+            var d = f.data;
+            var status = d.data > hoje ? '<span class="ger-badge ger-badge-blue">Agendada</span>' : '<span class="ger-badge ger-badge-gray">Concluída</span>';
+            html += '<div class="ger-card"><div class="ger-card-row">';
+            html += '<div><div class="ger-card-name">' + escapeHtml(d.userName || '') + '</div>';
+            html += '<div class="ger-card-meta">' + escapeHtml(d.data || '') + (d.motivo ? ' — ' + escapeHtml(d.motivo) : '') + '</div></div>';
+            html += '<div style="display:flex;gap:6px;align-items:center;">' + status;
+            if (isGerAdmin) html += ' <button type="button" class="ger-btn-danger" data-del-folga="' + f.id + '" title="Excluir">✕</button>';
+            html += '</div></div></div>';
+        });
+        container.innerHTML = html;
+        var addBtn = document.getElementById('btn-add-folga');
+        if (addBtn) addBtn.addEventListener('click', showFolgaForm);
+        container.querySelectorAll('[data-del-folga]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                if (!confirm('Excluir esta folga?')) return;
+                db.collection('folgas').doc(btn.getAttribute('data-del-folga')).delete().then(function() { loadFolgasTab(); showToast('Folga excluída!'); });
+            });
+        });
+    });
+}
+
+function showFolgaForm() {
+    var container = document.getElementById('form-folga-container');
+    if (!container) return;
+    container.style.display = 'block';
+    db.collection('users').get().then(function(snap) {
+        var opts = '';
+        snap.forEach(function(doc) {
+            var d = doc.data();
+            opts += '<option value="' + doc.id + '" data-name="' + escapeHtml(d.displayName || d.email || '') + '">' + escapeHtml(d.displayName || d.email || 'Sem nome') + '</option>';
+        });
+        container.innerHTML = '<div class="ger-form">' +
+            '<div style="flex:1;min-width:140px;"><label>Analista</label><select class="ger-select" id="folga-user" style="width:100%;">' + opts + '</select></div>' +
+            '<div><label>Data</label><input type="date" class="ger-input" id="folga-data"></div>' +
+            '<div style="flex:1;min-width:140px;"><label>Motivo (opcional)</label><input type="text" class="ger-input" id="folga-motivo" style="width:100%;" placeholder="Ex: Compensação"></div>' +
+            '<div><button type="button" class="ger-btn" id="btn-save-folga">Salvar</button> <button type="button" class="ger-btn-sm" id="btn-cancel-folga">Cancelar</button></div>' +
+            '</div>';
+        document.getElementById('btn-save-folga').addEventListener('click', saveFolga);
+        document.getElementById('btn-cancel-folga').addEventListener('click', function() { container.style.display = 'none'; });
+    });
+}
+
+function saveFolga() {
+    var sel = document.getElementById('folga-user');
+    var data = document.getElementById('folga-data').value;
+    if (!sel || !data) { alert('Preencha analista e data.'); return; }
+    var motivo = document.getElementById('folga-motivo').value.trim();
+    db.collection('folgas').add({
+        userId: sel.value,
+        userName: sel.options[sel.selectedIndex].getAttribute('data-name') || '',
+        data: data,
+        motivo: motivo,
+        criadoPor: currentUser ? currentUser.username : '',
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(function() { showToast('Folga lançada!'); loadFolgasTab(); });
+}
+
+// --- AUSENCIAS (gerente ve todas, usuario lanca as suas) ---
+function loadAusenciasTab() {
+    var container = document.getElementById('gerente-tab-ausencias');
+    if (!container) return;
+    container.innerHTML = '<div class="ger-empty">Carregando...</div>';
+    db.collection('ausencias').orderBy('data', 'desc').get().then(function(snap) {
+        var items = [];
+        snap.forEach(function(doc) { items.push({ id: doc.id, data: doc.data() }); });
+        var html = '';
+        if (items.length === 0) html += '<div class="ger-empty">Nenhuma ausência registrada.</div>';
+        var hoje = new Date().toISOString().slice(0, 10);
+        items.forEach(function(a) {
+            var d = a.data;
+            var status = d.data >= hoje ? '<span class="ger-badge ger-badge-blue">Agendada</span>' : '<span class="ger-badge ger-badge-gray">Passada</span>';
+            html += '<div class="ger-card"><div class="ger-card-row">';
+            html += '<div><div class="ger-card-name">' + escapeHtml(d.userName || '') + '</div>';
+            html += '<div class="ger-card-meta">' + escapeHtml(d.data || '') + ' | ' + escapeHtml(d.tipo || 'Ausência') + '</div>';
+            if (d.motivo) html += '<div class="ger-card-meta" style="margin-top:2px;">' + escapeHtml(d.motivo) + '</div>';
+            html += '</div>';
+            html += '<div style="display:flex;gap:6px;align-items:center;">' + status;
+            html += ' <button type="button" class="ger-btn-danger" data-del-ausencia="' + a.id + '" title="Excluir">✕</button>';
+            html += '</div></div></div>';
+        });
+        container.innerHTML = html;
+        container.querySelectorAll('[data-del-ausencia]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                if (!confirm('Excluir esta ausência?')) return;
+                db.collection('ausencias').doc(btn.getAttribute('data-del-ausencia')).delete().then(function() { loadAusenciasTab(); showToast('Ausência excluída!'); });
+            });
+        });
+    });
+}
+
+// --- MINHAS AUSENCIAS (usuario lanca) ---
+function loadMinhasAusencias() {
+    var container = document.getElementById('minhas-ausencias-content');
+    if (!container || !currentUser) return;
+    container.innerHTML = '<div class="ger-empty">Carregando...</div>';
+    db.collection('ausencias').where('userId', '==', currentUser.uid).orderBy('data', 'desc').get().then(function(snap) {
+        var items = [];
+        snap.forEach(function(doc) { items.push({ id: doc.id, data: doc.data() }); });
+        var html = '<div style="margin-bottom:12px;"><button type="button" class="ger-btn" id="btn-add-ausencia">+ Nova Ausência</button></div>';
+        html += '<div id="form-ausencia-container" style="display:none;"></div>';
+        if (items.length === 0) html += '<div class="ger-empty">Nenhuma ausência registrada.</div>';
+        var hoje = new Date().toISOString().slice(0, 10);
+        items.forEach(function(a) {
+            var d = a.data;
+            var status = d.data >= hoje ? '<span class="ger-badge ger-badge-blue">Agendada</span>' : '<span class="ger-badge ger-badge-gray">Passada</span>';
+            html += '<div class="ger-card"><div class="ger-card-row">';
+            html += '<div><div class="ger-card-name">' + escapeHtml(d.tipo || 'Ausência') + ' — ' + escapeHtml(d.data || '') + '</div>';
+            if (d.motivo) html += '<div class="ger-card-meta">' + escapeHtml(d.motivo) + '</div>';
+            html += '</div>';
+            html += '<div style="display:flex;gap:6px;align-items:center;">' + status;
+            html += ' <button type="button" class="ger-btn-danger" data-del-minha-ausencia="' + a.id + '" title="Excluir">✕</button>';
+            html += '</div></div></div>';
+        });
+        container.innerHTML = html;
+        document.getElementById('btn-add-ausencia').addEventListener('click', showAusenciaForm);
+        container.querySelectorAll('[data-del-minha-ausencia]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                if (!confirm('Excluir esta ausência?')) return;
+                db.collection('ausencias').doc(btn.getAttribute('data-del-minha-ausencia')).delete().then(function() { loadMinhasAusencias(); showToast('Ausência excluída!'); });
+            });
+        });
+    });
+}
+
+function showAusenciaForm() {
+    var container = document.getElementById('form-ausencia-container');
+    if (!container) return;
+    container.style.display = 'block';
+    container.innerHTML = '<div class="ger-form" style="flex-direction:column;align-items:stretch;">' +
+        '<div><label>Tipo</label><select class="ger-select" id="ausencia-tipo" style="width:100%;"><option value="Consulta médica">Consulta médica</option><option value="Consulta odontológica">Consulta odontológica</option><option value="Exame">Exame</option><option value="Compromisso pessoal">Compromisso pessoal</option><option value="Outro">Outro</option></select></div>' +
+        '<div><label>Data</label><input type="date" class="ger-input" id="ausencia-data" style="width:100%;"></div>' +
+        '<div><label>Horário (opcional)</label><input type="text" class="ger-input" id="ausencia-horario" style="width:100%;" placeholder="Ex: 14h às 16h"></div>' +
+        '<div><label>Motivo / Observação</label><input type="text" class="ger-input" id="ausencia-motivo" style="width:100%;" placeholder="Descreva o motivo"></div>' +
+        '<div style="display:flex;gap:6px;"><button type="button" class="ger-btn" id="btn-save-ausencia">Salvar</button><button type="button" class="ger-btn-sm" id="btn-cancel-ausencia">Cancelar</button></div>' +
+        '</div>';
+    document.getElementById('btn-save-ausencia').addEventListener('click', saveAusencia);
+    document.getElementById('btn-cancel-ausencia').addEventListener('click', function() { container.style.display = 'none'; });
+}
+
+function saveAusencia() {
+    var tipo = document.getElementById('ausencia-tipo').value;
+    var data = document.getElementById('ausencia-data').value;
+    var horario = document.getElementById('ausencia-horario').value.trim();
+    var motivo = document.getElementById('ausencia-motivo').value.trim();
+    if (!data) { alert('Informe a data.'); return; }
+    var descMotivo = tipo + (horario ? ' (' + horario + ')' : '') + (motivo ? ' — ' + motivo : '');
+    db.collection('ausencias').add({
+        userId: currentUser.uid,
+        userName: currentUser.username || '',
+        tipo: tipo,
+        data: data,
+        horario: horario,
+        motivo: descMotivo,
+        criadoPor: currentUser.username || '',
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(function() { showToast('Ausência registrada!'); loadMinhasAusencias(); });
+}
+
 function loadFeriasEquipe() {
     var list = document.getElementById('ferias-equipe-list');
     if (!list) return;
     list.innerHTML = '<div class="ger-empty">Carregando...</div>';
-    db.collection('ferias').orderBy('inicio', 'desc').get().then(function(snap) {
-        var items = [];
-        snap.forEach(function(doc) { items.push(doc.data()); });
-        if (items.length === 0) { list.innerHTML = '<div class="ger-empty">Nenhuma férias registrada.</div>'; return; }
+    var hoje = new Date().toISOString().slice(0, 10);
+    Promise.all([
+        db.collection('ferias').orderBy('inicio', 'desc').get(),
+        db.collection('folgas').orderBy('data', 'desc').get(),
+        db.collection('ausencias').orderBy('data', 'desc').get()
+    ]).then(function(results) {
         var html = '';
-        var hoje = new Date().toISOString().slice(0, 10);
-        items.forEach(function(d) {
-            var status = '';
-            if (d.inicio > hoje) status = '<span class="ger-badge ger-badge-blue">Agendada</span>';
-            else if (d.fim >= hoje) status = '<span class="ger-badge ger-badge-green">Em férias</span>';
-            else status = '<span class="ger-badge ger-badge-gray">Concluída</span>';
-            html += '<div class="ger-card"><div class="ger-card-row">';
-            html += '<div><div class="ger-card-name">' + escapeHtml(d.userName || 'Sem nome') + '</div>';
-            html += '<div class="ger-card-meta">' + escapeHtml(d.inicio || '') + ' a ' + escapeHtml(d.fim || '') + '</div></div>';
-            html += '<div>' + status + '</div></div></div>';
+        var feriasSnap = results[0]; var folgasSnap = results[1]; var ausenciasSnap = results[2];
+        html += '<div style="font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;text-transform:uppercase;">Férias</div>';
+        if (feriasSnap.empty) { html += '<div class="ger-empty" style="padding:12px;">Nenhuma férias.</div>'; }
+        feriasSnap.forEach(function(doc) {
+            var d = doc.data();
+            var status = d.inicio > hoje ? '<span class="ger-badge ger-badge-blue">Agendada</span>' : (d.fim >= hoje ? '<span class="ger-badge ger-badge-green">Em férias</span>' : '<span class="ger-badge ger-badge-gray">Concluída</span>');
+            html += '<div class="ger-card"><div class="ger-card-row"><div><div class="ger-card-name">' + escapeHtml(d.userName || '') + '</div><div class="ger-card-meta">' + escapeHtml(d.inicio || '') + ' a ' + escapeHtml(d.fim || '') + '</div></div><div>' + status + '</div></div></div>';
+        });
+        html += '<div style="font-size:11px;font-weight:600;color:var(--text-secondary);margin:12px 0 6px;text-transform:uppercase;">Folgas</div>';
+        if (folgasSnap.empty) { html += '<div class="ger-empty" style="padding:12px;">Nenhuma folga.</div>'; }
+        folgasSnap.forEach(function(doc) {
+            var d = doc.data();
+            var status = d.data > hoje ? '<span class="ger-badge ger-badge-blue">Agendada</span>' : '<span class="ger-badge ger-badge-gray">Concluída</span>';
+            html += '<div class="ger-card"><div class="ger-card-row"><div><div class="ger-card-name">' + escapeHtml(d.userName || '') + '</div><div class="ger-card-meta">' + escapeHtml(d.data || '') + (d.motivo ? ' — ' + escapeHtml(d.motivo) : '') + '</div></div><div>' + status + '</div></div></div>';
+        });
+        html += '<div style="font-size:11px;font-weight:600;color:var(--text-secondary);margin:12px 0 6px;text-transform:uppercase;">Ausências</div>';
+        if (ausenciasSnap.empty) { html += '<div class="ger-empty" style="padding:12px;">Nenhuma ausência.</div>'; }
+        ausenciasSnap.forEach(function(doc) {
+            var d = doc.data();
+            var status = d.data >= hoje ? '<span class="ger-badge ger-badge-blue">Agendada</span>' : '<span class="ger-badge ger-badge-gray">Passada</span>';
+            html += '<div class="ger-card"><div class="ger-card-row"><div><div class="ger-card-name">' + escapeHtml(d.userName || '') + '</div><div class="ger-card-meta">' + escapeHtml(d.data || '') + ' | ' + escapeHtml(d.tipo || '') + '</div></div><div>' + status + '</div></div></div>';
         });
         list.innerHTML = html;
     }).catch(function(e) { list.innerHTML = '<div class="ger-empty" style="color:var(--danger);">Erro: ' + e.message + '</div>'; });
@@ -3280,6 +3468,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (tab) tab.style.display = 'block';
             if (tabName === 'equipe') loadEquipeTab();
             else if (tabName === 'ferias') loadFeriasTab();
+            else if (tabName === 'folgas') loadFolgasTab();
+            else if (tabName === 'ausencias') loadAusenciasTab();
             else if (tabName === 'metas') loadMetasTab();
             else if (tabName === 'avisos') loadAvisosTab();
         });
@@ -3288,6 +3478,10 @@ document.addEventListener('DOMContentLoaded', function() {
     if (verFeriasBtn) verFeriasBtn.addEventListener('click', function() { loadFeriasEquipe(); toggleModal('modal-ferias-equipe', true); });
     var closeFeriasEquipeBtn = document.getElementById('close-ferias-equipe');
     if (closeFeriasEquipeBtn) closeFeriasEquipeBtn.addEventListener('click', function() { toggleModal('modal-ferias-equipe', false); });
+    var minhasAusBtn = document.getElementById('btn-minhas-ausencias');
+    if (minhasAusBtn) minhasAusBtn.addEventListener('click', function() { loadMinhasAusencias(); toggleModal('modal-minhas-ausencias', true); });
+    var closeMinhasAusBtn = document.getElementById('close-minhas-ausencias');
+    if (closeMinhasAusBtn) closeMinhasAusBtn.addEventListener('click', function() { toggleModal('modal-minhas-ausencias', false); });
     var extBtn = document.getElementById('btn-extensao-info');
     if (extBtn) extBtn.addEventListener('click', function() { toggleModal('modal-extensao', true); });
     var closeExtBtn = document.getElementById('close-extensao');
