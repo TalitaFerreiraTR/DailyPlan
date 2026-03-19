@@ -97,9 +97,14 @@ function showUserBar() {
     if (!bar || !currentUser) return;
     bar.style.display = 'flex';
     if (nameEl) nameEl.textContent = currentUser.username || '';
-    if (roleEl) roleEl.textContent = currentUser.role === 'gerente' ? 'Gerente (Admin)' : 'Analista';
+    var isAdminOrGerente = currentUser.role === 'admin' || currentUser.role === 'gerente';
+    if (roleEl) roleEl.textContent = currentUser.role === 'admin' ? 'Admin' : (currentUser.role === 'gerente' ? 'Gerente' : 'Analista');
     if (avatarEl && currentUser.photoURL) { avatarEl.src = currentUser.photoURL; avatarEl.style.display = 'block'; } else if (avatarEl) { avatarEl.style.display = 'none'; }
-    if (adminBtn) adminBtn.style.display = (currentUser.role === 'gerente') ? 'flex' : 'none';
+    if (adminBtn) adminBtn.style.display = isAdminOrGerente ? 'flex' : 'none';
+    var gerenteBtn = document.getElementById('btn-gerente-panel');
+    if (gerenteBtn) gerenteBtn.style.display = isAdminOrGerente ? 'flex' : 'none';
+    loadAvisosBanner();
+    loadMinhaMetaBar();
     if (!localStorage.getItem('dp_extensao_info_shown')) {
         localStorage.setItem('dp_extensao_info_shown', '1');
         setTimeout(function() { toggleModal('modal-extensao', true); }, 800);
@@ -126,9 +131,20 @@ function _onAuthReady(fbUser, callback) {
                 lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
             }, { merge: true });
         }
+        if (role === 'gerente') {
+            return db.collection('users').where('role', '==', 'admin').limit(1).get().then(function(snap) {
+                if (snap.empty) {
+                    userRef.set({ role: 'admin' }, { merge: true });
+                    return 'admin';
+                }
+                return role;
+            });
+        }
+        return role;
+    }).then(function(finalRole) {
         currentUser = {
             username: fbUser.displayName || fbUser.email || 'usuario',
-            role: role,
+            role: finalRole,
             photoURL: fbUser.photoURL || '',
             uid: fbUser.uid
         };
@@ -159,13 +175,92 @@ function loadAdminUsersList() {
             html += '<div class="admin-user-item" data-uid="' + doc.id + '">' +
                 '<img src="' + (d.photoURL || '') + '" onerror="this.style.display=\'none\'" alt="">' +
                 '<div style="flex:1;"><div class="admin-user-name">' + escapeHtml(d.displayName || d.email || doc.id) + '</div>' +
-                '<div class="admin-user-meta">' + (d.role === 'gerente' ? 'Gerente' : 'Analista') + ' | ' + casesCount + ' analises</div></div></div>';
+                '<div class="admin-user-meta">' + (d.role === 'admin' ? 'Admin' : (d.role === 'gerente' ? 'Gerente' : 'Analista')) + (d.cargo ? ' (' + escapeHtml(d.cargo) + ')' : '') + ' | ' + casesCount + ' analises</div></div>' +
+                '<button type="button" data-transfer-from="' + doc.id + '" data-transfer-name="' + escapeHtml(d.displayName || d.email || '') + '" style="background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-secondary);padding:4px 8px;border-radius:4px;font-size:10px;cursor:pointer;white-space:nowrap;" title="Transferir análises deste usuário para outro">Transferir</button>' +
+                '</div>';
         });
         list.innerHTML = html;
         list.querySelectorAll('.admin-user-item').forEach(function(el) {
-            el.addEventListener('click', function() { viewUserData(el.getAttribute('data-uid')); });
+            el.addEventListener('click', function(ev) {
+                if (ev.target.closest('[data-transfer-from]')) return;
+                viewUserData(el.getAttribute('data-uid'));
+            });
+        });
+        list.querySelectorAll('[data-transfer-from]').forEach(function(btn) {
+            btn.addEventListener('click', function(ev) {
+                ev.stopPropagation();
+                openTransferModal(btn.getAttribute('data-transfer-from'), btn.getAttribute('data-transfer-name'));
+            });
         });
     }).catch(function(e) { list.innerHTML = '<p style="color:var(--danger);">Erro ao carregar: ' + e.message + '</p>'; });
+}
+
+var _transferFromUid = '';
+var _transferFromName = '';
+function openTransferModal(fromUid, fromName) {
+    _transferFromUid = fromUid;
+    _transferFromName = fromName;
+    var container = document.getElementById('transfer-content');
+    if (!container) return;
+    container.innerHTML = '<p style="color:var(--text-secondary); font-size:12px;">Carregando usuários...</p>';
+    toggleModal('modal-transfer', true);
+    db.collection('users').get().then(function(snap) {
+        var html = '<p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">Copiar análises de <strong>' + escapeHtml(fromName) + '</strong> para:</p>';
+        html += '<select id="transfer-target" class="ger-select" style="width:100%; margin-bottom:12px; padding:8px;">';
+        snap.forEach(function(doc) {
+            if (doc.id === fromUid) return;
+            var d = doc.data();
+            html += '<option value="' + doc.id + '">' + escapeHtml(d.displayName || d.email || doc.id) + '</option>';
+        });
+        html += '</select>';
+        html += '<p style="font-size:11px; color:var(--text-secondary); margin-bottom:12px;">As análises serão <strong>adicionadas</strong> ao destino sem remover nada que já exista.</p>';
+        html += '<div style="display:flex; gap:8px;"><button type="button" class="ger-btn" id="btn-exec-transfer">Transferir</button>';
+        html += '<button type="button" class="ger-btn-sm" id="btn-cancel-transfer">Cancelar</button></div>';
+        container.innerHTML = html;
+        document.getElementById('btn-exec-transfer').addEventListener('click', executeTransfer);
+        document.getElementById('btn-cancel-transfer').addEventListener('click', function() { toggleModal('modal-transfer', false); });
+    });
+}
+
+function executeTransfer() {
+    var targetSel = document.getElementById('transfer-target');
+    if (!targetSel || !targetSel.value) { alert('Selecione o destino.'); return; }
+    var targetUid = targetSel.value;
+    var btn = document.getElementById('btn-exec-transfer');
+    if (btn) { btn.disabled = true; btn.textContent = 'Transferindo...'; }
+    var totalTransferred = 0;
+
+    db.collection('users').doc(_transferFromUid).get().then(function(srcDoc) {
+        if (!srcDoc.exists) throw new Error('Usuário origem não encontrado.');
+        var srcData = srcDoc.data();
+        var srcCases = [];
+        try { srcCases = JSON.parse(srcData.myCasesV14 || '[]'); } catch (e) {}
+        if (srcCases.length === 0) throw new Error('Usuário origem não possui análises.');
+        totalTransferred = srcCases.length;
+
+        return db.collection('users').doc(targetUid).get().then(function(tgtDoc) {
+            var tgtCases = [];
+            if (tgtDoc.exists) {
+                try { tgtCases = JSON.parse(tgtDoc.data().myCasesV14 || '[]'); } catch (e) {}
+            }
+            srcCases.forEach(function(c) {
+                var copy = JSON.parse(JSON.stringify(c));
+                copy.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+                tgtCases.push(copy);
+            });
+            return db.collection('users').doc(targetUid).set({
+                myCasesV14: JSON.stringify(tgtCases),
+                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+        });
+    }).then(function() {
+        showToast(totalTransferred + ' análises transferidas!');
+        toggleModal('modal-transfer', false);
+        loadAdminUsersList();
+    }).catch(function(e) {
+        alert('Erro na transferência: ' + e.message);
+        if (btn) { btn.disabled = false; btn.textContent = 'Transferir'; }
+    });
 }
 
 function viewUserData(uid) {
@@ -231,6 +326,384 @@ function contactOnTeams() {
     else msg += 'estava observando suas análises e verifiquei que ';
     var teamsUrl = 'https://teams.microsoft.com/l/chat/0/0?users=' + encodeURIComponent(adminViewUserEmail) + '&message=' + encodeURIComponent(msg);
     window.open(teamsUrl, '_blank');
+}
+
+// --- PAINEL DO GERENTE ---
+
+function openGerentePanel() {
+    toggleModal('modal-gerente', true);
+    loadEquipeTab();
+}
+
+function loadEquipeTab() {
+    var container = document.getElementById('gerente-tab-equipe');
+    if (!container) return;
+    container.innerHTML = '<div class="ger-empty">Carregando...</div>';
+    db.collection('users').get().then(function(snap) {
+        var users = [];
+        snap.forEach(function(doc) { users.push({ uid: doc.id, data: doc.data() }); });
+        users.sort(function(a, b) { return (a.data.displayName || '').localeCompare(b.data.displayName || ''); });
+        var html = '';
+        var isAdmin = currentUser && currentUser.role === 'admin';
+        users.forEach(function(u) {
+            var d = u.data;
+            var cargo = d.cargo || 'Analista';
+            var nota = d.notaSAI || '';
+            var role = d.role || 'normal';
+            html += '<div class="ger-card">';
+            html += '<div class="ger-card-row">';
+            html += '<div><div class="ger-card-name">' + escapeHtml(d.displayName || d.email || 'Sem nome') + '</div>';
+            html += '<div class="ger-card-meta">' + escapeHtml(d.email || '') + '</div></div>';
+            html += '<div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">';
+            if (isAdmin) {
+                html += '<select class="ger-role-select" data-uid="' + u.uid + '" data-field="role">';
+                html += '<option value="normal"' + (role === 'normal' ? ' selected' : '') + '>Usuário</option>';
+                html += '<option value="gerente"' + (role === 'gerente' ? ' selected' : '') + '>Gerente</option>';
+                html += '<option value="admin"' + (role === 'admin' ? ' selected' : '') + '>Admin</option>';
+                html += '</select>';
+            } else {
+                html += '<span class="ger-badge ' + (role === 'admin' ? 'ger-badge-blue' : role === 'gerente' ? 'ger-badge-green' : 'ger-badge-gray') + '">' + (role === 'admin' ? 'Admin' : role === 'gerente' ? 'Gerente' : 'Usuário') + '</span>';
+            }
+            html += '</div></div>';
+            html += '<div style="display:flex; gap:8px; margin-top:8px; align-items:center;">';
+            html += '<div style="flex:1;"><label style="font-size:10px; color:var(--text-secondary);">Cargo</label>';
+            html += '<select class="ger-select" style="width:100%;" data-uid="' + u.uid + '" data-field="cargo">';
+            html += '<option value="Analista"' + (cargo === 'Analista' ? ' selected' : '') + '>Analista</option>';
+            html += '<option value="Analista Senior"' + (cargo === 'Analista Senior' ? ' selected' : '') + '>Analista Sênior</option>';
+            html += '</select></div>';
+            html += '<div style="flex:1;"><label style="font-size:10px; color:var(--text-secondary);">Nota SAI</label>';
+            html += '<input type="text" class="ger-input" style="width:100%;" data-uid="' + u.uid + '" data-field="notaSAI" value="' + escapeHtml(nota) + '" placeholder="Ex: 8.5"></div>';
+            html += '</div>';
+            html += '</div>';
+        });
+        if (!html) html = '<div class="ger-empty">Nenhum usuário encontrado.</div>';
+        container.innerHTML = html;
+
+        container.querySelectorAll('.ger-select, .ger-input, .ger-role-select').forEach(function(el) {
+            el.addEventListener('change', function() {
+                var uid = this.getAttribute('data-uid');
+                var field = this.getAttribute('data-field');
+                var val = this.value;
+                if (!uid || !field) return;
+                var update = {};
+                update[field] = val;
+                db.collection('users').doc(uid).set(update, { merge: true }).then(function() {
+                    showToast(field === 'role' ? 'Perfil atualizado!' : 'Salvo!');
+                });
+            });
+            if (el.tagName === 'INPUT') {
+                el.addEventListener('blur', function() {
+                    var uid = this.getAttribute('data-uid');
+                    var field = this.getAttribute('data-field');
+                    var val = this.value;
+                    if (!uid || !field) return;
+                    var update = {};
+                    update[field] = val;
+                    db.collection('users').doc(uid).set(update, { merge: true });
+                });
+            }
+        });
+    });
+}
+
+function loadFeriasTab() {
+    var container = document.getElementById('gerente-tab-ferias');
+    if (!container) return;
+    var isGerAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'gerente');
+    container.innerHTML = '<div class="ger-empty">Carregando...</div>';
+
+    db.collection('ferias').orderBy('inicio', 'desc').get().then(function(snap) {
+        var items = [];
+        snap.forEach(function(doc) { items.push({ id: doc.id, data: doc.data() }); });
+        var html = '';
+        if (isGerAdmin) {
+            html += '<div style="margin-bottom:12px;"><button type="button" class="ger-btn" id="btn-add-ferias">+ Lançar Férias</button></div>';
+            html += '<div id="form-ferias-container" style="display:none;"></div>';
+        }
+        if (items.length === 0) {
+            html += '<div class="ger-empty">Nenhuma férias registrada.</div>';
+        }
+        items.forEach(function(f) {
+            var d = f.data;
+            var hoje = new Date().toISOString().slice(0, 10);
+            var status = '';
+            if (d.inicio > hoje) status = '<span class="ger-badge ger-badge-blue">Agendada</span>';
+            else if (d.fim >= hoje) status = '<span class="ger-badge ger-badge-green">Em férias</span>';
+            else status = '<span class="ger-badge ger-badge-gray">Concluída</span>';
+            html += '<div class="ger-card"><div class="ger-card-row">';
+            html += '<div><div class="ger-card-name">' + escapeHtml(d.userName || 'Sem nome') + '</div>';
+            html += '<div class="ger-card-meta">' + escapeHtml(d.inicio || '') + ' a ' + escapeHtml(d.fim || '') + '</div></div>';
+            html += '<div style="display:flex; gap:6px; align-items:center;">' + status;
+            if (isGerAdmin) html += ' <button type="button" class="ger-btn-danger" data-del-ferias="' + f.id + '" title="Excluir">✕</button>';
+            html += '</div></div></div>';
+        });
+        container.innerHTML = html;
+
+        var addBtn = document.getElementById('btn-add-ferias');
+        if (addBtn) addBtn.addEventListener('click', function() { showFeriasForm(); });
+
+        container.querySelectorAll('[data-del-ferias]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                if (!confirm('Excluir este registro de férias?')) return;
+                db.collection('ferias').doc(btn.getAttribute('data-del-ferias')).delete().then(function() {
+                    loadFeriasTab();
+                    showToast('Férias excluída!');
+                });
+            });
+        });
+    });
+}
+
+function showFeriasForm() {
+    var container = document.getElementById('form-ferias-container');
+    if (!container) return;
+    container.style.display = 'block';
+    db.collection('users').get().then(function(snap) {
+        var opts = '';
+        snap.forEach(function(doc) {
+            var d = doc.data();
+            opts += '<option value="' + doc.id + '" data-name="' + escapeHtml(d.displayName || d.email || '') + '">' + escapeHtml(d.displayName || d.email || 'Sem nome') + '</option>';
+        });
+        container.innerHTML = '<div class="ger-form">' +
+            '<div style="flex:1; min-width:140px;"><label>Analista</label><select class="ger-select" id="ferias-user" style="width:100%;">' + opts + '</select></div>' +
+            '<div><label>Início</label><input type="date" class="ger-input" id="ferias-inicio"></div>' +
+            '<div><label>Fim</label><input type="date" class="ger-input" id="ferias-fim"></div>' +
+            '<div><button type="button" class="ger-btn" id="btn-save-ferias">Salvar</button> <button type="button" class="ger-btn-sm" id="btn-cancel-ferias">Cancelar</button></div>' +
+            '</div>';
+        document.getElementById('btn-save-ferias').addEventListener('click', saveFerias);
+        document.getElementById('btn-cancel-ferias').addEventListener('click', function() { container.style.display = 'none'; });
+    });
+}
+
+function saveFerias() {
+    var sel = document.getElementById('ferias-user');
+    var inicio = document.getElementById('ferias-inicio').value;
+    var fim = document.getElementById('ferias-fim').value;
+    if (!sel || !inicio || !fim) { alert('Preencha todos os campos.'); return; }
+    var uid = sel.value;
+    var name = sel.options[sel.selectedIndex].getAttribute('data-name') || '';
+    db.collection('ferias').add({
+        userId: uid,
+        userName: name,
+        inicio: inicio,
+        fim: fim,
+        criadoPor: currentUser ? currentUser.username : '',
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(function() {
+        showToast('Férias lançada!');
+        loadFeriasTab();
+    });
+}
+
+function loadMetasTab() {
+    var container = document.getElementById('gerente-tab-metas');
+    if (!container) return;
+    var isGerAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'gerente');
+    container.innerHTML = '<div class="ger-empty">Carregando...</div>';
+
+    var mesAtual = new Date().toISOString().slice(0, 7);
+    Promise.all([
+        db.collection('users').get(),
+        db.collection('metas').where('mes', '==', mesAtual).get()
+    ]).then(function(results) {
+        var usersSnap = results[0];
+        var metasSnap = results[1];
+        var metasMap = {};
+        metasSnap.forEach(function(doc) {
+            var d = doc.data();
+            metasMap[d.userId] = { id: doc.id, texto: d.texto || '' };
+        });
+        var users = [];
+        usersSnap.forEach(function(doc) { users.push({ uid: doc.id, data: doc.data() }); });
+        users.sort(function(a, b) { return (a.data.displayName || '').localeCompare(b.data.displayName || ''); });
+
+        var html = '<div style="margin-bottom:12px; font-size:12px; color:var(--text-secondary);">Metas do mês: <strong>' + mesAtual + '</strong></div>';
+        users.forEach(function(u) {
+            var d = u.data;
+            var meta = metasMap[u.uid] || { id: null, texto: '' };
+            html += '<div class="ger-card">';
+            html += '<div class="ger-card-name" style="margin-bottom:6px;">' + escapeHtml(d.displayName || d.email || 'Sem nome') + '</div>';
+            if (isGerAdmin) {
+                html += '<textarea class="ger-input" style="width:100%; min-height:50px; resize:vertical;" data-meta-uid="' + u.uid + '" data-meta-name="' + escapeHtml(d.displayName || '') + '" data-meta-id="' + (meta.id || '') + '" placeholder="Definir meta...">' + escapeHtml(meta.texto) + '</textarea>';
+                html += '<div style="text-align:right; margin-top:4px;"><button type="button" class="ger-btn-sm" data-save-meta="' + u.uid + '">Salvar</button></div>';
+            } else {
+                html += '<div style="font-size:12px; color:var(--text-primary);">' + (meta.texto ? escapeHtml(meta.texto) : '<span style="color:var(--text-secondary);">Sem meta definida</span>') + '</div>';
+            }
+            html += '</div>';
+        });
+        container.innerHTML = html;
+
+        container.querySelectorAll('[data-save-meta]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var uid = btn.getAttribute('data-save-meta');
+                var textarea = container.querySelector('textarea[data-meta-uid="' + uid + '"]');
+                if (!textarea) return;
+                var texto = textarea.value.trim();
+                var metaId = textarea.getAttribute('data-meta-id');
+                var userName = textarea.getAttribute('data-meta-name') || '';
+                if (metaId) {
+                    db.collection('metas').doc(metaId).update({ texto: texto }).then(function() { showToast('Meta salva!'); });
+                } else {
+                    db.collection('metas').add({
+                        userId: uid,
+                        userName: userName,
+                        mes: mesAtual,
+                        texto: texto,
+                        criadoPor: currentUser ? currentUser.username : '',
+                        criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+                    }).then(function(ref) {
+                        textarea.setAttribute('data-meta-id', ref.id);
+                        showToast('Meta salva!');
+                    });
+                }
+            });
+        });
+    });
+}
+
+function loadAvisosTab() {
+    var container = document.getElementById('gerente-tab-avisos');
+    if (!container) return;
+    container.innerHTML = '<div class="ger-empty">Carregando...</div>';
+
+    db.collection('avisos').orderBy('criadoEm', 'desc').get().then(function(snap) {
+        var items = [];
+        snap.forEach(function(doc) { items.push({ id: doc.id, data: doc.data() }); });
+        var html = '<div style="margin-bottom:12px;"><button type="button" class="ger-btn" id="btn-add-aviso">+ Novo Aviso</button></div>';
+        html += '<div id="form-aviso-container" style="display:none;"></div>';
+        if (items.length === 0) {
+            html += '<div class="ger-empty">Nenhum aviso cadastrado.</div>';
+        }
+        items.forEach(function(a) {
+            var d = a.data;
+            var expira = d.expiraEm ? d.expiraEm : '';
+            var criado = d.criadoEm && d.criadoEm.toDate ? d.criadoEm.toDate().toLocaleDateString('pt-BR') : '';
+            html += '<div class="ger-card">';
+            html += '<div class="ger-card-row">';
+            html += '<div><div class="ger-card-name">' + escapeHtml(d.titulo || 'Sem título') + '</div>';
+            html += '<div class="ger-card-meta">Criado em ' + criado + ' por ' + escapeHtml(d.criadoPor || '') + (expira ? ' | Expira: ' + escapeHtml(expira) : '') + '</div></div>';
+            html += '<button type="button" class="ger-btn-danger" data-del-aviso="' + a.id + '" title="Excluir">✕</button>';
+            html += '</div>';
+            html += '<div style="font-size:12px; color:var(--text-primary); margin-top:6px; white-space:pre-wrap;">' + escapeHtml(d.texto || '') + '</div>';
+            html += '</div>';
+        });
+        container.innerHTML = html;
+
+        document.getElementById('btn-add-aviso').addEventListener('click', function() { showAvisoForm(); });
+
+        container.querySelectorAll('[data-del-aviso]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                if (!confirm('Excluir este aviso?')) return;
+                db.collection('avisos').doc(btn.getAttribute('data-del-aviso')).delete().then(function() {
+                    loadAvisosTab();
+                    showToast('Aviso excluído!');
+                });
+            });
+        });
+    });
+}
+
+function showAvisoForm() {
+    var container = document.getElementById('form-aviso-container');
+    if (!container) return;
+    container.style.display = 'block';
+    container.innerHTML = '<div class="ger-form" style="flex-direction:column; align-items:stretch;">' +
+        '<div><label>Título</label><input type="text" class="ger-input" id="aviso-titulo" style="width:100%;" placeholder="Título do aviso"></div>' +
+        '<div><label>Texto</label><textarea class="ger-input" id="aviso-texto" style="width:100%; min-height:60px; resize:vertical;" placeholder="Conteúdo do aviso..."></textarea></div>' +
+        '<div><label>Data de expiração (opcional)</label><input type="date" class="ger-input" id="aviso-expira"></div>' +
+        '<div style="display:flex; gap:6px;"><button type="button" class="ger-btn" id="btn-save-aviso">Publicar</button><button type="button" class="ger-btn-sm" id="btn-cancel-aviso">Cancelar</button></div>' +
+        '</div>';
+    document.getElementById('btn-save-aviso').addEventListener('click', saveAviso);
+    document.getElementById('btn-cancel-aviso').addEventListener('click', function() { container.style.display = 'none'; });
+}
+
+function saveAviso() {
+    var titulo = document.getElementById('aviso-titulo').value.trim();
+    var texto = document.getElementById('aviso-texto').value.trim();
+    var expira = document.getElementById('aviso-expira').value || '';
+    if (!titulo) { alert('Informe o título.'); return; }
+    db.collection('avisos').add({
+        titulo: titulo,
+        texto: texto,
+        criadoPor: currentUser ? currentUser.username : '',
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+        expiraEm: expira
+    }).then(function() {
+        showToast('Aviso publicado!');
+        loadAvisosTab();
+    });
+}
+
+function loadAvisosBanner() {
+    var banner = document.getElementById('avisos-banner');
+    if (!banner) return;
+    if (typeof db === 'undefined') return;
+    var hoje = new Date().toISOString().slice(0, 10);
+    db.collection('avisos').orderBy('criadoEm', 'desc').limit(5).get().then(function(snap) {
+        var avisos = [];
+        snap.forEach(function(doc) {
+            var d = doc.data();
+            if (d.expiraEm && d.expiraEm < hoje) return;
+            avisos.push(d);
+        });
+        if (avisos.length === 0) { banner.style.display = 'none'; return; }
+        var textos = avisos.map(function(a) { return '<strong>' + escapeHtml(a.titulo || '') + ':</strong> ' + escapeHtml(a.texto || ''); });
+        banner.innerHTML = '📢 ' + textos.join(' &nbsp;|&nbsp; ') + ' <span style="float:right; font-size:10px; opacity:0.6;">(clique para fechar)</span>';
+        banner.style.display = 'block';
+    }).catch(function() {});
+}
+
+function loadMinhaMetaBar() {
+    var bar = document.getElementById('minha-meta-bar');
+    var span = document.getElementById('minha-meta-text');
+    if (!bar || !span) return;
+    if (!currentUser || !currentUser.uid) return;
+    if (typeof db === 'undefined') return;
+    var mesAtual = new Date().toISOString().slice(0, 7);
+    db.collection('metas').where('userId', '==', currentUser.uid).where('mes', '==', mesAtual).limit(1).get().then(function(snap) {
+        if (snap.empty) { bar.style.display = 'none'; return; }
+        var texto = '';
+        snap.forEach(function(doc) { texto = doc.data().texto || ''; });
+        if (!texto) { bar.style.display = 'none'; return; }
+        span.textContent = texto;
+        bar.style.display = 'block';
+    }).catch(function() {});
+}
+
+function loadFeriasEquipe() {
+    var list = document.getElementById('ferias-equipe-list');
+    if (!list) return;
+    list.innerHTML = '<div class="ger-empty">Carregando...</div>';
+    db.collection('ferias').orderBy('inicio', 'desc').get().then(function(snap) {
+        var items = [];
+        snap.forEach(function(doc) { items.push(doc.data()); });
+        if (items.length === 0) { list.innerHTML = '<div class="ger-empty">Nenhuma férias registrada.</div>'; return; }
+        var html = '';
+        var hoje = new Date().toISOString().slice(0, 10);
+        items.forEach(function(d) {
+            var status = '';
+            if (d.inicio > hoje) status = '<span class="ger-badge ger-badge-blue">Agendada</span>';
+            else if (d.fim >= hoje) status = '<span class="ger-badge ger-badge-green">Em férias</span>';
+            else status = '<span class="ger-badge ger-badge-gray">Concluída</span>';
+            html += '<div class="ger-card"><div class="ger-card-row">';
+            html += '<div><div class="ger-card-name">' + escapeHtml(d.userName || 'Sem nome') + '</div>';
+            html += '<div class="ger-card-meta">' + escapeHtml(d.inicio || '') + ' a ' + escapeHtml(d.fim || '') + '</div></div>';
+            html += '<div>' + status + '</div></div></div>';
+        });
+        list.innerHTML = html;
+    }).catch(function(e) { list.innerHTML = '<div class="ger-empty" style="color:var(--danger);">Erro: ' + e.message + '</div>'; });
+}
+
+function showToast(msg) {
+    var existing = document.querySelector('.dp-toast');
+    if (existing) existing.remove();
+    var toast = document.createElement('div');
+    toast.className = 'dp-toast';
+    toast.textContent = msg;
+    toast.style.cssText = 'position:fixed; bottom:24px; right:24px; background:var(--tr-orange); color:#fff; padding:10px 20px; border-radius:8px; font-size:13px; font-weight:600; z-index:10001; box-shadow:0 4px 16px rgba(0,0,0,0.3); opacity:0; transition:opacity 0.3s;';
+    document.body.appendChild(toast);
+    requestAnimationFrame(function() { toast.style.opacity = '1'; });
+    setTimeout(function() { toast.style.opacity = '0'; setTimeout(function() { toast.remove(); }, 300); }, 2500);
 }
 
 // --- UTILITÁRIOS GLOBAIS ---
@@ -2130,22 +2603,27 @@ function writeBackupToFolder() {
 function exportData() {
     var user = getBackupUserName() || 'sem_usuario';
     var payload = { backupUser: user, exportedAt: new Date().toISOString(), cases: cases, groups: groups };
-    var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(payload));
+    var jsonStr = JSON.stringify(payload);
+    var encoded = btoa(unescape(encodeURIComponent(jsonStr)));
+    var blob = new Blob([encoded], { type: 'application/octet-stream' });
+    var url = URL.createObjectURL(blob);
     var dl = document.createElement('a');
-    dl.setAttribute("href", dataStr);
-    dl.setAttribute("download", "backup_total.json");
+    dl.href = url;
+    dl.download = 'backup_' + user.replace(/\s+/g, '_') + '.dpbak';
     document.body.appendChild(dl);
     dl.click();
     dl.remove();
+    URL.revokeObjectURL(url);
 }
 function saveBackupToOneDrive() {
     var user = getBackupUserName() || 'sem_usuario';
     var payload = { backupUser: user, exportedAt: new Date().toISOString(), cases: cases, groups: groups };
-    var data = JSON.stringify(payload);
+    var jsonStr = JSON.stringify(payload);
+    var encoded = btoa(unescape(encodeURIComponent(jsonStr)));
     if (typeof showSaveFilePicker === 'undefined') { exportData(); alert('Seu navegador não suporta "escolher pasta". O backup foi baixado; salve-o manualmente na pasta do OneDrive.'); return; }
-    showSaveFilePicker({ suggestedName: 'backup_total.json', types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }] }).then(function(handle) {
+    showSaveFilePicker({ suggestedName: 'backup_' + user.replace(/\s+/g, '_') + '.dpbak', types: [{ description: 'DailyPlan Backup', accept: { 'application/octet-stream': ['.dpbak'] } }] }).then(function(handle) {
         return handle.createWritable().then(function(writable) {
-            writable.write(data);
+            writable.write(encoded);
             return writable.close();
         });
     }).then(function() { alert('Backup salvo! Se escolheu uma pasta do OneDrive, o arquivo será sincronizado para a nuvem.'); }).catch(function(err) {
@@ -2158,8 +2636,18 @@ function importData(input) {
     var reader = new FileReader();
     reader.onload = function(e) {
         var raw = e.target.result;
+        var decoded = raw;
+        try {
+            decoded = decodeURIComponent(escape(atob(raw.trim())));
+        } catch (b64err) {}
         var data;
-        try { data = JSON.parse(raw); } catch (err) { alert('Arquivo JSON inválido.'); input.value = ''; return; }
+        try { data = JSON.parse(decoded); } catch (err) {
+            try { data = JSON.parse(raw); } catch (err2) {
+                alert('Arquivo inválido. Verifique se o formato está correto (.dpbak ou .json).');
+                input.value = '';
+                return;
+            }
+        }
         var importedCases = [];
         if (Array.isArray(data)) {
             importedCases = data;
@@ -2778,6 +3266,28 @@ document.addEventListener('DOMContentLoaded', function() {
     if (adminBtn) adminBtn.addEventListener('click', function() { loadAdminUsersList(); toggleModal('modal-admin', true); });
     var closeAdminBtn = document.getElementById('close-admin');
     if (closeAdminBtn) closeAdminBtn.addEventListener('click', function() { toggleModal('modal-admin', false); });
+    var gerenteBtn2 = document.getElementById('btn-gerente-panel');
+    if (gerenteBtn2) gerenteBtn2.addEventListener('click', function() { openGerentePanel(); });
+    var closeGerenteBtn = document.getElementById('close-gerente');
+    if (closeGerenteBtn) closeGerenteBtn.addEventListener('click', function() { toggleModal('modal-gerente', false); });
+    document.querySelectorAll('.gerente-tab-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.gerente-tab-btn').forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            document.querySelectorAll('.gerente-tab-content').forEach(function(c) { c.style.display = 'none'; });
+            var tabName = btn.getAttribute('data-tab');
+            var tab = document.getElementById('gerente-tab-' + tabName);
+            if (tab) tab.style.display = 'block';
+            if (tabName === 'equipe') loadEquipeTab();
+            else if (tabName === 'ferias') loadFeriasTab();
+            else if (tabName === 'metas') loadMetasTab();
+            else if (tabName === 'avisos') loadAvisosTab();
+        });
+    });
+    var verFeriasBtn = document.getElementById('btn-ver-ferias');
+    if (verFeriasBtn) verFeriasBtn.addEventListener('click', function() { loadFeriasEquipe(); toggleModal('modal-ferias-equipe', true); });
+    var closeFeriasEquipeBtn = document.getElementById('close-ferias-equipe');
+    if (closeFeriasEquipeBtn) closeFeriasEquipeBtn.addEventListener('click', function() { toggleModal('modal-ferias-equipe', false); });
     var extBtn = document.getElementById('btn-extensao-info');
     if (extBtn) extBtn.addEventListener('click', function() { toggleModal('modal-extensao', true); });
     var closeExtBtn = document.getElementById('close-extensao');
