@@ -227,6 +227,7 @@ function sendObsToSGD() {
     if (!c || !c.ssNumero) { alert('Este caso não possui número de SS.'); return; }
     var obs = (getVal('input-obs') || '').trim();
     if (!obs) { alert('O campo Observações está vazio.'); return; }
+    if (!confirm('Enviar observações para a SS ' + c.ssNumero + ' no SGD?\n\nRequisitos:\n• A página da SS ' + c.ssNumero + ' precisa estar aberta no navegador\n• A extensão DailyPlan v7.0 precisa estar instalada e atualizada\n\nDeseja continuar?')) return;
     var btn = getEl('btn-send-obs-sgd');
     if (btn) { btn.textContent = 'Enviando...'; btn.disabled = true; }
     var hasNativeAccess = (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage);
@@ -286,6 +287,7 @@ function sendTechToPSAI() {
     if (!psaiCode) { alert('Este caso não possui código de PSAI. Preencha o campo "Cód. PSAI" na Visão Geral.'); return; }
     var content = buildTechContent();
     if (!content) { alert('Nenhum conteúdo no Detalhamento Técnico para enviar.'); return; }
+    if (!confirm('Enviar detalhamento técnico para a PSAI ' + psaiCode + ' no SGD?\n\nRequisitos:\n• A página da PSAI ' + psaiCode + ' precisa estar aberta no navegador\n• A extensão DailyPlan v7.0 precisa estar instalada e atualizada\n\nDeseja continuar?')) return;
     var btn = getEl('btn-send-tech-psai');
     if (btn) { btn.textContent = 'Enviando...'; btn.disabled = true; }
     var hasNativeAccess = (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage);

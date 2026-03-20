@@ -109,6 +109,11 @@ function showUserBar() {
         localStorage.setItem('dp_extensao_info_shown', '1');
         setTimeout(function() { toggleModal('modal-extensao', true); }, 800);
     }
+    var EXT_VERSION_KEY = 'dp_ext_update_dismissed_v';
+    var CURRENT_EXT_VERSION = '7.0';
+    if (localStorage.getItem(EXT_VERSION_KEY) !== CURRENT_EXT_VERSION) {
+        setTimeout(function() { toggleModal('modal-update-ext', true); }, 1200);
+    }
 }
 
 function _onAuthReady(fbUser, callback) {
@@ -1067,6 +1072,7 @@ function sendObsToSGD() {
     if (!c || !c.ssNumero) { alert('Este caso não possui número de SS.'); return; }
     var obs = (getVal('input-obs') || '').trim();
     if (!obs) { alert('O campo Observações está vazio.'); return; }
+    if (!confirm('Enviar observações para a SS ' + c.ssNumero + ' no SGD?\n\nRequisitos:\n• A página da SS ' + c.ssNumero + ' precisa estar aberta no navegador\n• A extensão DailyPlan v7.0 precisa estar instalada e atualizada\n\nDeseja continuar?')) return;
     var btn = getEl('btn-send-obs-sgd');
     if (btn) { btn.textContent = 'Enviando...'; btn.disabled = true; }
     var hasNativeAccess = (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage);
@@ -1126,6 +1132,7 @@ function sendTechToPSAI() {
     if (!psaiCode) { alert('Este caso não possui código de PSAI. Preencha o campo "Cód. PSAI" na Visão Geral.'); return; }
     var content = buildTechContent();
     if (!content) { alert('Nenhum conteúdo no Detalhamento Técnico para enviar.'); return; }
+    if (!confirm('Enviar detalhamento técnico para a PSAI ' + psaiCode + ' no SGD?\n\nRequisitos:\n• A página da PSAI ' + psaiCode + ' precisa estar aberta no navegador\n• A extensão DailyPlan v7.0 precisa estar instalada e atualizada\n\nDeseja continuar?')) return;
     var btn = getEl('btn-send-tech-psai');
     if (btn) { btn.textContent = 'Enviando...'; btn.disabled = true; }
     var hasNativeAccess = (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage);
@@ -3639,6 +3646,10 @@ document.addEventListener('DOMContentLoaded', function() {
     if (extBtn) extBtn.addEventListener('click', function() { toggleModal('modal-extensao', true); });
     var closeExtBtn = document.getElementById('close-extensao');
     if (closeExtBtn) closeExtBtn.addEventListener('click', function() { toggleModal('modal-extensao', false); });
+    var closeUpdateExt = document.getElementById('close-update-ext');
+    if (closeUpdateExt) closeUpdateExt.addEventListener('click', function() { toggleModal('modal-update-ext', false); });
+    var dismissUpdateExt = document.getElementById('btn-dismiss-update-ext');
+    if (dismissUpdateExt) dismissUpdateExt.addEventListener('click', function() { localStorage.setItem('dp_ext_update_dismissed_v', '7.0'); toggleModal('modal-update-ext', false); });
 
     if (typeof firebase !== 'undefined' && firebase.auth) {
         firebase.auth().onAuthStateChanged(function(fbUser) {

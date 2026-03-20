@@ -941,6 +941,42 @@
             </div>
         </div>
     </div>
+    <div id="modal-update-ext" class="modal">
+        <div class="modal-content" style="max-width:480px; width:95%;">
+            <div class="modal-header">
+                <strong><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;vertical-align:-2px;margin-right:6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Atualização da Extensão</strong>
+                <button class="header-btn" id="close-update-ext"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg></button>
+            </div>
+            <div class="modal-body" style="font-size:13px; line-height:1.7; color:var(--text-primary);">
+                <div style="text-align:center; margin-bottom:16px;">
+                    <div style="font-size:32px; margin-bottom:8px;">🔄</div>
+                    <strong style="font-size:15px;">Nova versão da extensão disponível (v7.0)</strong>
+                </div>
+                <div style="background:var(--bg-body); border:1px solid var(--border-color); border-radius:8px; padding:14px; margin-bottom:16px;">
+                    <strong style="display:block; margin-bottom:8px;">O que há de novo:</strong>
+                    <ul style="margin:0; padding-left:18px; font-size:12px;">
+                        <li style="margin-bottom:6px;">Enviar <strong>observações</strong> diretamente para a SS no SGD</li>
+                        <li style="margin-bottom:6px;">Enviar <strong>detalhamento técnico</strong> para as anotações da PSAI no SGD</li>
+                        <li style="margin-bottom:0;">Integração bidirecional DailyPlan ↔ SGD</li>
+                    </ul>
+                </div>
+                <div style="background:rgba(234,179,8,0.15); border:1px solid #eab308; border-radius:8px; padding:14px; margin-bottom:16px;">
+                    <strong style="display:block; margin-bottom:6px; color:#ca8a04;">Como atualizar:</strong>
+                    <ol style="margin:0; padding-left:18px; font-size:12px;">
+                        <li style="margin-bottom:4px;">Baixe a nova versão clicando no botão abaixo</li>
+                        <li style="margin-bottom:4px;">Extraia e substitua os arquivos da pasta da extensão</li>
+                        <li style="margin-bottom:4px;">Acesse <code style="background:var(--bg-input); padding:2px 6px; border-radius:3px; font-size:11px;">chrome://extensions</code></li>
+                        <li style="margin-bottom:0;">Clique no botão <strong>recarregar</strong> (↻) da extensão DailyPlan</li>
+                    </ol>
+                </div>
+                <a href="https://github.com/TalitaFerreiraTR/DailyPlan/archive/refs/heads/main.zip" target="_blank" rel="noopener" style="display:flex; align-items:center; justify-content:center; gap:8px; padding:12px 20px; background:var(--tr-orange); color:#fff; border-radius:8px; text-decoration:none; font-weight:600; font-size:14px; transition:0.2s;">
+                    <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:#fff;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Baixar Extensão v7.0
+                </a>
+                <button type="button" id="btn-dismiss-update-ext" class="footer-link" style="display:block; text-align:center; margin:12px auto 0; font-size:12px;">Já atualizei, não mostrar novamente</button>
+            </div>
+        </div>
+    </div>
     <div id="modal-extensao" class="modal">
         <div class="modal-content" style="max-width:520px; width:95%;">
             <div class="modal-header">
