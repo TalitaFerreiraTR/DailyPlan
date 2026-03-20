@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "DailyPlan | Product Focus",
-  "version": "7.0",
-  "description": "Foco em produto: PSAI, SS, SAI e mais",
+  "version": "7.0.0",
+  "description": "Gestão diária de produto com integração SGD — PSAI, SS e SAI",
   "permissions": ["storage", "activeTab", "scripting", "tabs"],
   "host_permissions": [
     "https://*.dominiosistemas.com.br/*",
@@ -11,9 +11,9 @@
   ],
   "background": { "service_worker": "background.js" },
   "action": {
-    "default_icon": { "16": "icon.png", "48": "icon.png", "128": "icon.png" }
+    "default_icon": { "16": "icon16.png", "48": "icon48.png", "128": "icon128.png" }
   },
-  "icons": { "16": "icon.png", "48": "icon.png", "128": "icon.png" },
+  "icons": { "16": "icon16.png", "48": "icon48.png", "128": "icon128.png" },
   "content_scripts": [
     {
       "matches": ["https://sgd.dominiosistemas.com.br/sgsa/faces/psai.html*"],

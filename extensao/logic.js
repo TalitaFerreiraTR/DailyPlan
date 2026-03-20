@@ -243,7 +243,7 @@ function sendObsToSGD() {
             }
         });
     } else {
-        window.postMessage({ type: 'DP_REQUEST_WRITE_SS', ssNumero: c.ssNumero, text: obs, autoSubmit: true }, '*');
+        window.postMessage({ type: 'DP_REQUEST_WRITE_SS', ssNumero: c.ssNumero, text: obs, autoSubmit: true }, window.location.origin);
         if (btn) setTimeout(function() { btn.textContent = 'Enviar para SGD ↗'; btn.disabled = false; }, 3000);
     }
 }
@@ -303,7 +303,7 @@ function sendTechToPSAI() {
             }
         });
     } else {
-        window.postMessage({ type: 'DP_REQUEST_WRITE_PSAI', psaiCode: psaiCode, text: content, autoSubmit: true }, '*');
+        window.postMessage({ type: 'DP_REQUEST_WRITE_PSAI', psaiCode: psaiCode, text: content, autoSubmit: true }, window.location.origin);
         if (btn) setTimeout(function() { btn.innerHTML = '<svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg> Enviar para PSAI'; btn.disabled = false; }, 3000);
     }
 }

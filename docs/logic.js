@@ -50,19 +50,32 @@ function _flushToFirestore() {
 }
 window.addEventListener('beforeunload', _flushToFirestore);
 
+function _countCases(jsonStr) {
+    if (!jsonStr) return 0;
+    try { return JSON.parse(jsonStr).length; } catch (e) { return 0; }
+}
+
 function _loadFromFirestore(callback) {
     if (!firebaseUid || typeof db === 'undefined') { if (callback) callback(); return; }
     db.collection('users').doc(firebaseUid).get().then(function(doc) {
         if (doc.exists) {
             var data = doc.data();
-            var localHasData = SYNC_KEYS.some(function(k) { return !!localStorage.getItem(k); });
-            var remoteHasData = SYNC_KEYS.some(function(k) { return !!data[k]; });
-            if (remoteHasData) {
-                var remoteTs = data.lastUpdated ? data.lastUpdated.toMillis() : 0;
-                var localTs = parseInt(localStorage.getItem('dp_lastSyncTs') || '0', 10);
-                if (!localHasData || remoteTs > localTs) {
-                    SYNC_KEYS.forEach(function(k) { if (data[k]) localStorage.setItem(k, data[k]); });
-                    if (remoteTs) localStorage.setItem('dp_lastSyncTs', String(remoteTs));
+            var localCases = localStorage.getItem('myCasesV14') || '';
+            var remoteCases = data.myCasesV14 || '';
+            var localCount = _countCases(localCases);
+            var remoteCount = _countCases(remoteCases);
+
+            if (remoteCount > 0 && remoteCount >= localCount) {
+                SYNC_KEYS.forEach(function(k) { if (data[k]) localStorage.setItem(k, data[k]); });
+                if (data.lastUpdated) localStorage.setItem('dp_lastSyncTs', String(data.lastUpdated.toMillis()));
+            } else if (localCount > 0 && localCount > remoteCount) {
+                var pushData = {};
+                SYNC_KEYS.forEach(function(k) { var v = localStorage.getItem(k); if (v) pushData[k] = v; });
+                if (Object.keys(pushData).length > 0) {
+                    pushData.lastUpdated = firebase.firestore.FieldValue.serverTimestamp();
+                    db.collection('users').doc(firebaseUid).set(pushData, { merge: true }).then(function() {
+                        localStorage.setItem('dp_lastSyncTs', String(Date.now()));
+                    }).catch(function(e) { console.warn('Firestore push error:', e); });
                 }
             }
         }
@@ -88,6 +101,32 @@ function logoutUser() {
 }
 function getCurrentUserSync() { return currentUser; }
 
+function _looksLikeEmail(s) { return s && s.indexOf('@') !== -1; }
+
+function _startNameEdit(nameEl) {
+    if (nameEl.querySelector('input')) return;
+    var current = (currentUser && currentUser.username) || '';
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.value = _looksLikeEmail(current) ? '' : current;
+    input.placeholder = 'Digite seu nome';
+    input.style.cssText = 'width:100%;font-size:11px;padding:2px 4px;border:1px solid var(--tr-orange);border-radius:3px;background:var(--bg-input);color:var(--text-primary);outline:none;';
+    nameEl.textContent = '';
+    nameEl.appendChild(input);
+    input.focus();
+    function save() {
+        var val = (input.value || '').trim();
+        if (!val) { nameEl.textContent = current; return; }
+        currentUser.username = val;
+        nameEl.textContent = val;
+        if (firebaseUid && typeof db !== 'undefined') {
+            db.collection('users').doc(firebaseUid).set({ displayName: val }, { merge: true });
+        }
+    }
+    input.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } if (e.key === 'Escape') { nameEl.textContent = current; } });
+    input.addEventListener('blur', save);
+}
+
 function showUserBar() {
     var bar = document.getElementById('user-bar');
     var nameEl = document.getElementById('user-display-name');
@@ -96,7 +135,16 @@ function showUserBar() {
     var adminBtn = document.getElementById('btn-admin-panel');
     if (!bar || !currentUser) return;
     bar.style.display = 'flex';
-    if (nameEl) nameEl.textContent = currentUser.username || '';
+    if (nameEl) {
+        nameEl.textContent = currentUser.username || '';
+        if (_looksLikeEmail(currentUser.username)) {
+            nameEl.innerHTML = '<span style="color:var(--tr-orange);font-size:10px;">Clique para definir seu nome</span>';
+        }
+        if (!nameEl._dpClickBound) {
+            nameEl._dpClickBound = true;
+            nameEl.addEventListener('click', function() { _startNameEdit(nameEl); });
+        }
+    }
     var isAdminOrGerente = currentUser.role === 'admin' || currentUser.role === 'gerente';
     if (roleEl) roleEl.textContent = currentUser.role === 'admin' ? 'Admin' : (currentUser.role === 'gerente' ? 'Gerente' : 'Analista');
     if (avatarEl && currentUser.photoURL) { avatarEl.src = currentUser.photoURL; avatarEl.style.display = 'block'; } else if (avatarEl) { avatarEl.style.display = 'none'; }
@@ -109,11 +157,6 @@ function showUserBar() {
         localStorage.setItem('dp_extensao_info_shown', '1');
         setTimeout(function() { toggleModal('modal-extensao', true); }, 800);
     }
-    var EXT_VERSION_KEY = 'dp_ext_update_dismissed_v';
-    var CURRENT_EXT_VERSION = '7.0';
-    if (localStorage.getItem(EXT_VERSION_KEY) !== CURRENT_EXT_VERSION) {
-        setTimeout(function() { toggleModal('modal-update-ext', true); }, 1200);
-    }
 }
 
 function _onAuthReady(fbUser, callback) {
@@ -123,10 +166,12 @@ function _onAuthReady(fbUser, callback) {
     }
     firebaseUid = fbUser.uid;
     var userRef = db.collection('users').doc(fbUser.uid);
+    var _firestoreName = '';
     userRef.get().then(function(doc) {
         var role = 'normal';
         if (doc.exists && doc.data().role) {
             role = doc.data().role;
+            _firestoreName = (doc.data().displayName || '').trim();
         } else {
             userRef.set({
                 displayName: fbUser.displayName || fbUser.email || '',
@@ -148,7 +193,7 @@ function _onAuthReady(fbUser, callback) {
         return role;
     }).then(function(finalRole) {
         currentUser = {
-            username: fbUser.displayName || fbUser.email || 'usuario',
+            username: _firestoreName || fbUser.displayName || fbUser.email || 'usuario',
             role: finalRole,
             photoURL: fbUser.photoURL || '',
             uid: fbUser.uid
@@ -370,6 +415,8 @@ function loadEquipeTab() {
                 html += '<span class="ger-badge ' + (role === 'admin' ? 'ger-badge-blue' : role === 'gerente' ? 'ger-badge-green' : 'ger-badge-gray') + '">' + (role === 'admin' ? 'Admin' : role === 'gerente' ? 'Gerente' : 'Usuário') + '</span>';
             }
             html += '</div></div>';
+            html += '<div style="margin-top:8px;"><label style="font-size:10px; color:var(--text-secondary);">Nome de exibição</label>';
+            html += '<input type="text" class="ger-input" style="width:100%;" data-uid="' + u.uid + '" data-field="displayName" value="' + escapeHtml(d.displayName || '') + '" placeholder="Nome do colaborador"></div>';
             html += '<div style="display:flex; gap:8px; margin-top:8px; align-items:center;">';
             html += '<div style="flex:1;"><label style="font-size:10px; color:var(--text-secondary);">Cargo</label>';
             html += '<select class="ger-select" style="width:100%;" data-uid="' + u.uid + '" data-field="cargo">';
@@ -1088,7 +1135,7 @@ function sendObsToSGD() {
             }
         });
     } else {
-        window.postMessage({ type: 'DP_REQUEST_WRITE_SS', ssNumero: c.ssNumero, text: obs, autoSubmit: true }, '*');
+        window.postMessage({ type: 'DP_REQUEST_WRITE_SS', ssNumero: c.ssNumero, text: obs, autoSubmit: true }, window.location.origin);
         if (btn) setTimeout(function() { btn.textContent = 'Enviar para SGD ↗'; btn.disabled = false; }, 3000);
     }
 }
@@ -1148,7 +1195,7 @@ function sendTechToPSAI() {
             }
         });
     } else {
-        window.postMessage({ type: 'DP_REQUEST_WRITE_PSAI', psaiCode: psaiCode, text: content, autoSubmit: true }, '*');
+        window.postMessage({ type: 'DP_REQUEST_WRITE_PSAI', psaiCode: psaiCode, text: content, autoSubmit: true }, window.location.origin);
         if (btn) setTimeout(function() { btn.innerHTML = '<svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg> Enviar para PSAI'; btn.disabled = false; }, 3000);
     }
 }
@@ -3509,7 +3556,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
                 return;
             }
-            window.postMessage({ type: 'DP_REQUEST_SCRAPE_SS', ssNumero: ssNumero }, '*');
+            window.postMessage({ type: 'DP_REQUEST_SCRAPE_SS', ssNumero: ssNumero }, window.location.origin);
             alert('Lendo SS da aba aberta... Aguarde um momento.');
         },
         'btn-send-obs-sgd': sendObsToSGD,
@@ -3648,10 +3695,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (extBtn) extBtn.addEventListener('click', function() { toggleModal('modal-extensao', true); });
     var closeExtBtn = document.getElementById('close-extensao');
     if (closeExtBtn) closeExtBtn.addEventListener('click', function() { toggleModal('modal-extensao', false); });
-    var closeUpdateExt = document.getElementById('close-update-ext');
-    if (closeUpdateExt) closeUpdateExt.addEventListener('click', function() { toggleModal('modal-update-ext', false); });
-    var dismissUpdateExt = document.getElementById('btn-dismiss-update-ext');
-    if (dismissUpdateExt) dismissUpdateExt.addEventListener('click', function() { localStorage.setItem('dp_ext_update_dismissed_v', '7.0'); toggleModal('modal-update-ext', false); });
 
     if (typeof firebase !== 'undefined' && firebase.auth) {
         firebase.auth().onAuthStateChanged(function(fbUser) {
