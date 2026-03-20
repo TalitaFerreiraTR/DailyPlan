@@ -2607,8 +2607,10 @@ document.addEventListener('DOMContentLoaded', function() {
     var researchWrapper = getEl('research-wrapper');
     if (researchWrapper) {
         researchWrapper.addEventListener('click', function(e) {
-            if (e.target.classList.contains('remove-btn')) { e.target.closest('.link-row').remove(); triggerAutoSave(); }
-            if (e.target.classList.contains('open-link-btn')) { var url = (e.target.closest('.link-row-top') || e.target.parentElement).querySelector('.link-url').value; openUrlInNewTab(url); }
+            var removeBtn = e.target.closest('.remove-btn');
+            if (removeBtn) { removeBtn.closest('.link-row').remove(); triggerAutoSave(); }
+            var openBtn = e.target.closest('.open-link-btn');
+            if (openBtn) { var row = openBtn.closest('.link-row-top') || openBtn.parentElement; var url = row.querySelector('.link-url').value; openUrlInNewTab(url); }
             var addBtn = e.target.closest('.btn-add-research-topic');
             if (addBtn && addBtn.getAttribute('data-topic')) { addResearchRow('', '', true, addBtn.getAttribute('data-topic')); }
         });
