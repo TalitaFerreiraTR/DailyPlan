@@ -17,7 +17,7 @@
   "content_scripts": [
     {
       "matches": ["https://sgd.dominiosistemas.com.br/sgsa/faces/psai.html*"],
-      "js": ["injetor-psai.js"],
+      "js": ["content-psai-scraper.js", "injetor-psai.js"],
       "run_at": "document_idle"
     },
     {

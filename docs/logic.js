@@ -994,6 +994,28 @@ function init() {
                 alert(resp.error);
             }
         }
+        if (e.data && e.data.type === 'DP_WRITE_SS_RESULT') {
+            var wr = e.data.data || {};
+            var btnSGD = getEl('btn-send-obs-sgd');
+            if (btnSGD) { btnSGD.textContent = 'Enviar para SGD ↗'; btnSGD.disabled = false; }
+            if (wr.ok) {
+                var wmsg = wr.submitted ? 'Anotação enviada para o SGD!' : 'Campo preenchido no SGD. ' + (wr.warning || 'Submeta manualmente.');
+                alert('✅ ' + wmsg);
+            } else {
+                alert('❌ Erro: ' + (wr.error || 'Falha desconhecida.'));
+            }
+        }
+        if (e.data && e.data.type === 'DP_WRITE_PSAI_RESULT') {
+            var pr = e.data.data || {};
+            var btnPSAI = getEl('btn-send-tech-psai');
+            if (btnPSAI) { btnPSAI.innerHTML = '<svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg> Enviar para PSAI'; btnPSAI.disabled = false; }
+            if (pr.ok) {
+                var pmsg = pr.submitted ? 'Detalhamento enviado para a PSAI no SGD!' : 'Campo preenchido na PSAI. ' + (pr.warning || 'Submeta manualmente.');
+                alert('✅ ' + pmsg);
+            } else {
+                alert('❌ Erro: ' + (pr.error || 'Falha desconhecida.'));
+            }
+        }
     });
     window.addEventListener('storage', function(e) {
         if (e.key === 'myCasesV14' && e.newValue) { try { cases = JSON.parse(e.newValue); } catch (ex) {} renderSidebar(); }
@@ -1036,6 +1058,92 @@ function deleteNote(id) {
     notes = notes.filter(function(n) { return n.id !== id; });
     storageSet({ 'generalNotesList': JSON.stringify(notes) });
     renderNotes();
+}
+
+// --- ENVIAR PARA SGD ---
+function sendObsToSGD() {
+    if (!currentId) return;
+    var c = cases.find(function(x) { return x.id === currentId; });
+    if (!c || !c.ssNumero) { alert('Este caso não possui número de SS.'); return; }
+    var obs = (getVal('input-obs') || '').trim();
+    if (!obs) { alert('O campo Observações está vazio.'); return; }
+    var btn = getEl('btn-send-obs-sgd');
+    if (btn) { btn.textContent = 'Enviando...'; btn.disabled = true; }
+    var hasNativeAccess = (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage);
+    if (hasNativeAccess) {
+        chrome.runtime.sendMessage({ action: 'DP_WRITE_SS_NOTE', ssNumero: c.ssNumero, text: obs, autoSubmit: true }, function(response) {
+            if (btn) { btn.textContent = 'Enviar para SGD ↗'; btn.disabled = false; }
+            if (!response) { alert('Extensão não respondeu. Verifique se está ativa.'); return; }
+            if (response.ok) {
+                var msg = response.submitted ? 'Anotação enviada para a SS ' + c.ssNumero + ' no SGD!' : 'Campo preenchido na SS ' + c.ssNumero + '. ' + (response.warning || 'Submeta manualmente no SGD.');
+                alert('✅ ' + msg);
+            } else {
+                alert('❌ Erro: ' + (response.error || 'Falha desconhecida.'));
+            }
+        });
+    } else {
+        window.postMessage({ type: 'DP_REQUEST_WRITE_SS', ssNumero: c.ssNumero, text: obs, autoSubmit: true }, '*');
+        if (btn) setTimeout(function() { btn.textContent = 'Enviar para SGD ↗'; btn.disabled = false; }, 3000);
+    }
+}
+
+function buildTechContent() {
+    var parts = [];
+    var c = currentId ? cases.find(function(x) { return x.id === currentId; }) : null;
+    if (!c) return '';
+    var dominio = (c.psaiTestDomain || '').trim();
+    if (dominio) {
+        parts.push('=== EMPRESA DE TESTE ===');
+        parts.push('Domínio: ' + dominio);
+        if (dominio.indexOf('Local') !== -1 && c.psaiDominioLocalEmpresa) parts.push('Empresa Local: ' + c.psaiDominioLocalEmpresa);
+        if (dominio.indexOf('Web') !== -1 && c.psaiDominioWebEmpresa) parts.push('Empresa Web: ' + c.psaiDominioWebEmpresa);
+        if (c.psaiDominioLocalRepro) parts.push('Situação reproduzida no banco de teste (Local): Sim');
+        if (c.psaiDominioWebRepro) parts.push('Situação reproduzida no banco de teste (Web): Sim');
+        parts.push('');
+    }
+    var testsEl = getEl('input-tests');
+    var tests = testsEl ? (testsEl.innerText || '').trim() : '';
+    if (tests) {
+        parts.push('=== TESTES REALIZADOS ===');
+        parts.push(tests);
+        parts.push('');
+    }
+    var solutionEl = getEl('input-solution');
+    var solution = solutionEl ? (solutionEl.innerText || '').trim() : '';
+    if (solution) {
+        parts.push('=== SOLUÇÃO FINAL ===');
+        parts.push(solution);
+        parts.push('');
+    }
+    return parts.join('\n').trim();
+}
+
+function sendTechToPSAI() {
+    if (!currentId) return;
+    var c = cases.find(function(x) { return x.id === currentId; });
+    if (!c) return;
+    var psaiCode = getPsaiCode(c.psaiLink);
+    if (!psaiCode) { alert('Este caso não possui código de PSAI. Preencha o campo "Cód. PSAI" na Visão Geral.'); return; }
+    var content = buildTechContent();
+    if (!content) { alert('Nenhum conteúdo no Detalhamento Técnico para enviar.'); return; }
+    var btn = getEl('btn-send-tech-psai');
+    if (btn) { btn.textContent = 'Enviando...'; btn.disabled = true; }
+    var hasNativeAccess = (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage);
+    if (hasNativeAccess) {
+        chrome.runtime.sendMessage({ action: 'DP_WRITE_PSAI_NOTE', psaiCode: psaiCode, text: content, autoSubmit: true }, function(response) {
+            if (btn) { btn.innerHTML = '<svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg> Enviar para PSAI'; btn.disabled = false; }
+            if (!response) { alert('Extensão não respondeu. Verifique se está ativa.'); return; }
+            if (response.ok) {
+                var msg = response.submitted ? 'Detalhamento enviado para a PSAI ' + psaiCode + ' no SGD!' : 'Campo preenchido na PSAI ' + psaiCode + '. ' + (response.warning || 'Submeta manualmente no SGD.');
+                alert('✅ ' + msg);
+            } else {
+                alert('❌ Erro: ' + (response.error || 'Falha desconhecida.'));
+            }
+        });
+    } else {
+        window.postMessage({ type: 'DP_REQUEST_WRITE_PSAI', psaiCode: psaiCode, text: content, autoSubmit: true }, '*');
+        if (btn) setTimeout(function() { btn.innerHTML = '<svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg> Enviar para PSAI'; btn.disabled = false; }, 3000);
+    }
 }
 
 // --- GRUPOS ---
@@ -1498,6 +1606,10 @@ function loadCase(id) {
     renderManagerReviews(c.managerReviews || []);
     switchMainPanel(c.workType || 'PSAI');
     renderTramitesList(c.ssTramites || []);
+    var btnSendSGD = getEl('btn-send-obs-sgd');
+    if (btnSendSGD) btnSendSGD.style.display = (c.ssNumero && c.workType === 'SS') ? '' : 'none';
+    var btnSendPSAI = getEl('btn-send-tech-psai');
+    if (btnSendPSAI) btnSendPSAI.style.display = (getPsaiCode(c.psaiLink) && c.workType === 'PSAI') ? '' : 'none';
     analyzeData(id);
     renderSidebar();
 }
@@ -3392,7 +3504,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             window.postMessage({ type: 'DP_REQUEST_SCRAPE_SS', ssNumero: ssNumero }, '*');
             alert('Lendo SS da aba aberta... Aguarde um momento.');
-        }
+        },
+        'btn-send-obs-sgd': sendObsToSGD,
+        'btn-send-tech-psai': sendTechToPSAI
     };
     for (var actionId in actions) { if (!actions.hasOwnProperty(actionId)) continue; var el = getEl(actionId); if (el) el.addEventListener('click', actions[actionId]); }
     var groupNameEditInput = getEl('group-view-name-edit');

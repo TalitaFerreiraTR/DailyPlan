@@ -1,5 +1,6 @@
 (function() {
     var SYNC_KEYS = ['myCasesV14', 'generalNotesList', 'myGroupsV1'];
+    var TRUSTED_ORIGIN = window.location.origin;
 
     function mergeAndNotify() {
         chrome.storage.local.get(SYNC_KEYS, function(extData) {
@@ -29,7 +30,7 @@
             });
 
             if (anyAdded) {
-                window.postMessage({ type: 'DP_EXT_SYNC' }, '*');
+                window.postMessage({ type: 'DP_EXT_SYNC' }, TRUSTED_ORIGIN);
             }
         });
     }
@@ -44,7 +45,22 @@
         if (event.source !== window || !event.data) return;
         if (event.data.type === 'DP_REQUEST_SCRAPE_SS') {
             chrome.runtime.sendMessage({ action: 'DP_SCRAPE_SS_TAB', ssNumero: event.data.ssNumero || '' }, function(response) {
-                window.postMessage({ type: 'DP_SCRAPE_SS_RESULT', data: response || { error: 'Extensão não respondeu.' } }, '*');
+                window.postMessage({ type: 'DP_SCRAPE_SS_RESULT', data: response || { error: 'Extensão não respondeu.' } }, TRUSTED_ORIGIN);
+            });
+        }
+        if (event.data.type === 'DP_REQUEST_WRITE_SS') {
+            chrome.runtime.sendMessage({ action: 'DP_WRITE_SS_NOTE', ssNumero: event.data.ssNumero || '', text: event.data.text || '', autoSubmit: event.data.autoSubmit !== false }, function(response) {
+                window.postMessage({ type: 'DP_WRITE_SS_RESULT', data: response || { ok: false, error: 'Extensão não respondeu.' } }, TRUSTED_ORIGIN);
+            });
+        }
+        if (event.data.type === 'DP_REQUEST_DISCOVER_SS') {
+            chrome.runtime.sendMessage({ action: 'DP_DISCOVER_SS_FORM', ssNumero: event.data.ssNumero || '' }, function(response) {
+                window.postMessage({ type: 'DP_DISCOVER_SS_RESULT', data: response || { error: 'Extensão não respondeu.' } }, TRUSTED_ORIGIN);
+            });
+        }
+        if (event.data.type === 'DP_REQUEST_WRITE_PSAI') {
+            chrome.runtime.sendMessage({ action: 'DP_WRITE_PSAI_NOTE', psaiCode: event.data.psaiCode || '', text: event.data.text || '', autoSubmit: event.data.autoSubmit !== false }, function(response) {
+                window.postMessage({ type: 'DP_WRITE_PSAI_RESULT', data: response || { ok: false, error: 'Extensão não respondeu.' } }, TRUSTED_ORIGIN);
             });
         }
     });

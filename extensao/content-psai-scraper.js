@@ -1,12 +1,14 @@
 /**
- * Content script: ponte para o DailyPlan.
- * Roda em https://sgd.dominiosistemas.com.br/sgsa/faces/ss.html*
- * - SCRAPE_SS: lê o HTML da página e envia para o painel preencher automaticamente.
- * - DISCOVER_SS_FORM: descobre campos de formulário editáveis na página (textareas, inputs, iframes).
- * - WRITE_SS_NOTE: preenche o campo de anotação/trâmite e submete o formulário.
+ * Content script: ponte de escrita para o DailyPlan na PSAI.
+ * Roda em https://sgd.dominiosistemas.com.br/sgsa/faces/psai.html*
+ * - WRITE_PSAI_NOTE: preenche o campo de anotação/trâmite e submete.
+ * - DISCOVER_PSAI_FORM: lista campos editáveis da página.
  */
 (function() {
     if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.onMessage) return;
+
+    var FIELD_KEYWORDS = ['anotac', 'tramite', 'observac', 'texto', 'conteudo', 'descricao', 'mensagem', 'nota', 'comment'];
+    var SUBMIT_KEYWORDS = ['salvar', 'enviar', 'gravar', 'adicionar', 'incluir', 'save', 'submit', 'ok', 'confirmar'];
 
     function discoverFormFields() {
         var results = { textareas: [], inputs: [], iframes: [], buttons: [], forms: [] };
@@ -19,7 +21,7 @@
         document.querySelectorAll('iframe').forEach(function(el) {
             results.iframes.push({ id: el.id, name: el.name, className: el.className, src: el.src || '', visible: el.offsetParent !== null });
         });
-        document.querySelectorAll('button, input[type="submit"], input[type="button"], a.button, a[onclick]').forEach(function(el) {
+        document.querySelectorAll('button, input[type="submit"], input[type="button"], a[onclick]').forEach(function(el) {
             var text = (el.textContent || el.value || '').trim().substring(0, 60);
             results.buttons.push({ tag: el.tagName, id: el.id, name: el.name || '', className: el.className, text: text, type: el.type || '', visible: el.offsetParent !== null });
         });
@@ -30,12 +32,11 @@
     }
 
     function findWritableField() {
-        var keywords = ['anotac', 'tramite', 'observac', 'texto', 'conteudo', 'descricao', 'mensagem', 'nota', 'comment'];
         var ta = document.querySelectorAll('textarea');
         for (var i = 0; i < ta.length; i++) {
             var hint = ((ta[i].id || '') + ' ' + (ta[i].name || '') + ' ' + (ta[i].className || '') + ' ' + (ta[i].placeholder || '')).toLowerCase();
-            for (var k = 0; k < keywords.length; k++) {
-                if (hint.indexOf(keywords[k]) !== -1 && ta[i].offsetParent !== null) return { type: 'textarea', el: ta[i] };
+            for (var k = 0; k < FIELD_KEYWORDS.length; k++) {
+                if (hint.indexOf(FIELD_KEYWORDS[k]) !== -1 && ta[i].offsetParent !== null) return { type: 'textarea', el: ta[i] };
             }
         }
         var iframes = document.querySelectorAll('iframe');
@@ -61,18 +62,17 @@
     function findSubmitButton(field) {
         var container = field.el.closest('form') || field.el.closest('div') || document.body;
         var btns = container.querySelectorAll('button, input[type="submit"], input[type="button"], a[onclick]');
-        var keywords = ['salvar', 'enviar', 'gravar', 'adicionar', 'incluir', 'save', 'submit', 'ok', 'confirmar'];
         for (var i = 0; i < btns.length; i++) {
             var text = ((btns[i].textContent || btns[i].value || '') + ' ' + (btns[i].title || '')).toLowerCase();
-            for (var k = 0; k < keywords.length; k++) {
-                if (text.indexOf(keywords[k]) !== -1 && btns[i].offsetParent !== null) return btns[i];
+            for (var k = 0; k < SUBMIT_KEYWORDS.length; k++) {
+                if (text.indexOf(SUBMIT_KEYWORDS[k]) !== -1 && btns[i].offsetParent !== null) return btns[i];
             }
         }
         var allBtns = document.querySelectorAll('button, input[type="submit"], input[type="button"]');
         for (var j = 0; j < allBtns.length; j++) {
             var txt = ((allBtns[j].textContent || allBtns[j].value || '') + ' ' + (allBtns[j].title || '')).toLowerCase();
-            for (var m = 0; m < keywords.length; m++) {
-                if (txt.indexOf(keywords[m]) !== -1 && allBtns[j].offsetParent !== null) return allBtns[j];
+            for (var m = 0; m < SUBMIT_KEYWORDS.length; m++) {
+                if (txt.indexOf(SUBMIT_KEYWORDS[m]) !== -1 && allBtns[j].offsetParent !== null) return allBtns[j];
             }
         }
         return null;
@@ -80,7 +80,7 @@
 
     function writeNote(text, autoSubmit) {
         var field = findWritableField();
-        if (!field) return { ok: false, error: 'Nenhum campo editável encontrado na página da SS. Use "Descobrir Formulário" para inspecionar a página.' };
+        if (!field) return { ok: false, error: 'Nenhum campo editável encontrado na página da PSAI. Verifique se a página está completa.' };
         try {
             if (field.type === 'textarea') {
                 field.el.focus();
@@ -103,7 +103,7 @@
                 btn.click();
                 return { ok: true, submitted: true, fieldType: field.type };
             }
-            return { ok: true, submitted: false, fieldType: field.type, warning: 'Campo preenchido, mas botão de envio não encontrado. Submeta manualmente.' };
+            return { ok: true, submitted: false, fieldType: field.type, warning: 'Campo preenchido, mas botão de envio não encontrado. Submeta manualmente no SGD.' };
         }
         return { ok: true, submitted: false, fieldType: field.type };
     }
@@ -111,16 +111,7 @@
     chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
         if (!msg || !msg.action) return;
 
-        if (msg.action === 'SCRAPE_SS') {
-            try {
-                sendResponse({ html: document.documentElement.outerHTML });
-            } catch (e) {
-                sendResponse({ error: (e && e.message) || 'Erro ao ler página' });
-            }
-            return true;
-        }
-
-        if (msg.action === 'DISCOVER_SS_FORM') {
+        if (msg.action === 'DISCOVER_PSAI_FORM') {
             try {
                 sendResponse({ fields: discoverFormFields() });
             } catch (e) {
@@ -129,7 +120,7 @@
             return true;
         }
 
-        if (msg.action === 'WRITE_SS_NOTE') {
+        if (msg.action === 'WRITE_PSAI_NOTE') {
             try {
                 var result = writeNote(msg.text || '', msg.autoSubmit !== false);
                 sendResponse(result);

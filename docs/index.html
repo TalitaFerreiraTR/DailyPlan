@@ -563,7 +563,11 @@
                             <div><label>Tipo</label><input type="text" id="input-type" placeholder="Ex: Melhoria"></div>
                         </div>
                         <label>Descrição</label><textarea id="input-psai-desc" style="min-height:60px;"></textarea>
-                        <label>Observações</label><textarea id="input-obs" style="min-height:40px; background:var(--bg-body);" placeholder="Anotações extras..."></textarea>
+                        <div style="display:flex; align-items:center; justify-content:space-between;">
+                            <label>Observações</label>
+                            <button type="button" id="btn-send-obs-sgd" class="footer-link" title="Enviar observações para a SS no SGD" style="font-size:10px; display:none;">Enviar para SGD ↗</button>
+                        </div>
+                        <textarea id="input-obs" style="min-height:40px; background:var(--bg-body);" placeholder="Anotações extras..."></textarea>
                         <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top:10px;">
                             <div><label>Status</label>
                                 <select id="input-status">
@@ -841,7 +845,7 @@
                         <div id="input-solution" class="rich-input" contenteditable="true" placeholder="Descreva a solução final..."></div>
                     </div>
                     
-                    <div class="footer-actions"><button class="btn-secondary btn-action" id="btn-export-single-tech">Exportar Este</button><div style="flex:1"></div><button class="btn-danger btn-action" id="btn-delete-tech" title="Excluir"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:16px;height:16px;"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button><button class="btn-secondary btn-action" id="btn-copy-tech"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg> Copiar Conteúdo</button><button class="btn-primary btn-action" id="btn-save-tech">Salvar Agora</button></div>
+                    <div class="footer-actions"><button class="btn-secondary btn-action" id="btn-export-single-tech">Exportar Este</button><button class="btn-secondary btn-action" id="btn-send-tech-psai" style="display:none;" title="Enviar detalhamento técnico para as anotações da PSAI no SGD"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg> Enviar para PSAI</button><div style="flex:1"></div><button class="btn-danger btn-action" id="btn-delete-tech" title="Excluir"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:16px;height:16px;"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button><button class="btn-secondary btn-action" id="btn-copy-tech"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg> Copiar Conteúdo</button><button class="btn-primary btn-action" id="btn-save-tech">Salvar Agora</button></div>
                 </div>
             </div>
         </div>
