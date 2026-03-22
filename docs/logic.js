@@ -1658,6 +1658,7 @@ function loadCase(id) {
     if (!c.researchByTopic && c.researchLinks) { c.researchByTopic = { saiLiberadas: [], ne: [], outros: (c.researchLinks || []).slice() }; }
     renderResearch(c.researchByTopic);
     renderManagerReviews(c.managerReviews || []);
+    renderChecklist22(c.checklist22 || {});
     switchMainPanel(c.workType || 'PSAI');
     renderTramitesList(c.ssTramites || []);
     var btnSendSGD = getEl('btn-send-obs-sgd');
@@ -1731,6 +1732,8 @@ function saveCurrentCaseMemory() {
         var reason = (row.querySelector('.manager-reason') || {}).value || '';
         if (date || who || reason) c.managerReviews.push({ date: date, who: who, reason: reason });
     });
+
+    c.checklist22 = readChecklist22();
 }
 
 function saveCurrentCase() { saveCurrentCaseMemory(); saveData(false); }
@@ -2442,6 +2445,86 @@ function copyContextoResumoContent() {
     var text = parts.filter(Boolean).join('\n\n');
     if (!text) text = 'Nenhum conteúdo.';
     navigator.clipboard.writeText(text).then(function() { alert('Conteúdo (Contexto & Resumo) copiado!'); }).catch(function() { alert('Erro ao copiar.'); });
+}
+
+// --- CHECKLIST ESTRATÉGICO SEÇÃO 22 ---
+var CHECKLIST22_ITEMS = [
+    { key: 'dorResolvida', emoji: '\uD83C\uDFAF', label: 'Dor resolvida', desc: 'Entendo claramente a dor a ser resolvida e acredito que vamos resolver?' },
+    { key: 'onboarding', emoji: '\uD83D\uDE80', label: 'Onboarding', desc: 'Estamos facilitando o Onboarding de clientes?' },
+    { key: 'demandaSuporte', emoji: '\uD83C\uDFA7', label: 'Demanda de suporte', desc: 'Estamos mitigando impacto em demanda de suporte?' },
+    { key: 'reducaoCusto', emoji: '\uD83D\uDCB0', label: 'Redução de custo', desc: 'Existem oportunidades de reduzir custo (DW, Cloud, Manutenções, ...)?' },
+    { key: 'performance', emoji: '\u26A1', label: 'Performance', desc: 'Estamos contornando o risco de criar problemas de performance?' },
+    { key: 'jornadaCliente', emoji: '\uD83D\uDEE3\uFE0F', label: 'Jornada do cliente', desc: 'A entrega nasceu integrada com a jornada do cliente (Processos, Messenger, Portal do Cliente, Serviços Financeiros, ...)?' },
+    { key: 'medicaoSucesso', emoji: '\uD83D\uDCCA', label: 'Medição de sucesso', desc: 'A entrega está preparada para medir sucesso (observabilidades)?' },
+    { key: 'ia', emoji: '\uD83E\uDD16', label: 'IA', desc: 'A jornada/funcionalidade poderia ser reimaginada com IA?' },
+    { key: 'cloud', emoji: '\u2601\uFE0F', label: 'Cloud', desc: 'Estamos prevenindo a necessidade de reconstruir em cloud novamente?' },
+    { key: 'comunicacaoValor', emoji: '\uD83D\uDCE2', label: 'Comunicação de valor', desc: 'Estamos comunicando claramente a dor que resolvemos (proposta de valor) e acreditamos que com isso as áreas terão condições de vender e reter mais?' }
+];
+
+function renderChecklist22(data) {
+    var container = getEl('checklist22-items');
+    if (!container) return;
+    data = data || {};
+    container.innerHTML = CHECKLIST22_ITEMS.map(function(item) {
+        var val = data[item.key] || '';
+        var obs = data[item.key + '_obs'] || '';
+        return '<div style="border:1px solid var(--border-color); border-radius:8px; padding:12px; background:var(--bg-card);">' +
+            '<div style="display:flex; align-items:flex-start; gap:10px; margin-bottom:8px;">' +
+                '<span style="font-size:18px; flex-shrink:0; line-height:1;">' + item.emoji + '</span>' +
+                '<div style="flex:1; min-width:0;">' +
+                    '<div style="font-size:12px; font-weight:600; color:var(--text-primary); margin-bottom:2px;">' + escapeHtml(item.label) + '</div>' +
+                    '<div style="font-size:11px; color:var(--text-secondary); line-height:1.4;">' + escapeHtml(item.desc) + '</div>' +
+                '</div>' +
+                '<select class="ger-select checklist22-select" data-ck-key="' + item.key + '" style="width:auto; min-width:90px; font-size:11px; padding:4px 6px;">' +
+                    '<option value="">Pendente</option>' +
+                    '<option value="sim"' + (val === 'sim' ? ' selected' : '') + '>Sim</option>' +
+                    '<option value="nao"' + (val === 'nao' ? ' selected' : '') + '>Não</option>' +
+                    '<option value="na"' + (val === 'na' ? ' selected' : '') + '>N/A</option>' +
+                    '<option value="parcial"' + (val === 'parcial' ? ' selected' : '') + '>Parcial</option>' +
+                '</select>' +
+            '</div>' +
+            '<input type="text" class="ger-input checklist22-obs" data-ck-key="' + item.key + '_obs" value="' + escapeHtml(obs) + '" placeholder="Observação (opcional)" style="width:100%; font-size:11px; padding:5px 8px;">' +
+        '</div>';
+    }).join('');
+}
+
+function readChecklist22() {
+    var data = {};
+    document.querySelectorAll('.checklist22-select').forEach(function(sel) {
+        data[sel.getAttribute('data-ck-key')] = sel.value;
+    });
+    document.querySelectorAll('.checklist22-obs').forEach(function(inp) {
+        var v = (inp.value || '').trim();
+        if (v) data[inp.getAttribute('data-ck-key')] = v;
+    });
+    return data;
+}
+
+function copyChecklist22() {
+    if (!currentId) return;
+    saveCurrentCaseMemory();
+    var c = cases.find(function(x) { return x.id === currentId; });
+    if (!c) return;
+    var ck = c.checklist22 || {};
+    var labels = { sim: 'Sim', nao: 'Não', na: 'N/A', parcial: 'Parcial' };
+    var lines = ['CHECKLIST ESTRATÉGICO OBRIGATÓRIO — SEÇÃO 22', ''];
+    if (c.title) lines.push('Análise: ' + c.title, '');
+    CHECKLIST22_ITEMS.forEach(function(item) {
+        var val = ck[item.key] || '';
+        var obs = ck[item.key + '_obs'] || '';
+        var status = val ? labels[val] || val : 'Pendente';
+        lines.push(item.emoji + ' ' + item.label + ': ' + status);
+        lines.push('   ' + item.desc);
+        if (obs) lines.push('   Obs: ' + obs);
+        lines.push('');
+    });
+    var total = CHECKLIST22_ITEMS.length;
+    var preenchidos = CHECKLIST22_ITEMS.filter(function(i) { return !!ck[i.key]; }).length;
+    lines.push('Preenchimento: ' + preenchidos + '/' + total);
+    navigator.clipboard.writeText(lines.join('\n')).then(function() {
+        var btn = getEl('btn-copy-checklist22');
+        if (btn) { var orig = btn.innerHTML; btn.textContent = 'Copiado!'; setTimeout(function() { btn.innerHTML = orig; }, 1500); }
+    });
 }
 
 function copyTechnicalData() {
@@ -3526,8 +3609,8 @@ document.addEventListener('DOMContentLoaded', function() {
         'btn-go': openPsaiLink, 
 'btn-add-sa': addSaFromForm,
         'btn-add-manager': () => addManagerReviewRow(),
-        'btn-save-gen': saveCurrentCase, 'btn-save-tech': saveCurrentCase, 'btn-delete-gen': deleteCase, 'btn-delete-tech': deleteCase,
-        'btn-copy-tech': copyTechnicalData, 'btn-copy-contexto': copyContextoResumoContent, 'btn-export-single-gen': exportSingleCase, 'btn-export-single-tech': exportSingleCase,
+        'btn-save-gen': saveCurrentCase, 'btn-save-tech': saveCurrentCase, 'btn-save-checklist22': saveCurrentCase, 'btn-delete-gen': deleteCase, 'btn-delete-tech': deleteCase,
+        'btn-copy-tech': copyTechnicalData, 'btn-copy-checklist22': copyChecklist22, 'btn-copy-contexto': copyContextoResumoContent, 'btn-export-single-gen': exportSingleCase, 'btn-export-single-tech': exportSingleCase,
         'btn-ler-ss': function() { setVal('ss-html-paste', ''); toggleModal('modal-ler-ss', true); },
         'close-ler-ss': () => toggleModal('modal-ler-ss', false),
         'btn-ss-upload-html': function() { var f = getEl('file-ss-html'); if (f) f.click(); },

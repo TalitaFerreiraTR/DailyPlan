@@ -522,6 +522,7 @@
             <div class="tabs-header">
                 <button type="button" class="tab-btn active" data-tab="tab-general" id="btn-tab-general"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:12px;height:12px;vertical-align:-2px;margin-right:4px;"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>Visão Geral</button>
                 <button type="button" class="tab-btn" data-tab="tab-technical"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:12px;height:12px;vertical-align:-2px;margin-right:4px;"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>Detalhamento Técnico</button>
+                <button type="button" class="tab-btn" data-tab="tab-checklist22"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:12px;height:12px;vertical-align:-2px;margin-right:4px;"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Seção 22</button>
                 <div style="flex:1"></div>
                 <span id="save-status">SALVO</span>
             </div>
@@ -846,6 +847,19 @@
                     </div>
                     
                     <div class="footer-actions"><button class="btn-secondary btn-action" id="btn-export-single-tech">Exportar Este</button><button class="btn-secondary btn-action" id="btn-send-tech-psai" style="display:none;" title="Enviar detalhamento técnico para as anotações da PSAI no SGD"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg> Enviar para PSAI</button><div style="flex:1"></div><button class="btn-danger btn-action" id="btn-delete-tech" title="Excluir"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:16px;height:16px;"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button><button class="btn-secondary btn-action" id="btn-copy-tech"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg> Copiar Conteúdo</button><button class="btn-primary btn-action" id="btn-save-tech">Salvar Agora</button></div>
+                </div>
+
+                <div id="tab-checklist22" class="tab-content">
+                    <div class="card" style="margin-bottom:0;">
+                        <h4 style="margin:0 0 16px; font-size:13px; font-weight:700; color:var(--tr-orange); text-transform:uppercase; letter-spacing:0.5px;">Checklist Estratégico Obrigatório — Seção 22</h4>
+                        <div id="checklist22-items" style="display:flex; flex-direction:column; gap:14px;">
+                        </div>
+                    </div>
+                    <div class="footer-actions">
+                        <button class="btn-secondary btn-action" id="btn-copy-checklist22"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg> Copiar Checklist</button>
+                        <div style="flex:1"></div>
+                        <button class="btn-primary btn-action" id="btn-save-checklist22">Salvar Agora</button>
+                    </div>
                 </div>
             </div>
         </div>
