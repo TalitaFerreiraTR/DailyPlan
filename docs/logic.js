@@ -2507,27 +2507,23 @@ function copyChecklist22() {
     if (!c) return;
     var ck = c.checklist22 || {};
     var labels = { sim: 'Sim', nao: 'Não', na: 'N/A', parcial: 'Parcial' };
-    var html = '<p><b>CHECKLIST ESTRATÉGICO OBRIGATÓRIO</b></p>';
-    var plain = 'CHECKLIST ESTRATÉGICO OBRIGATÓRIO\n\n';
-    if (c.title) { html += '<p>Análise: ' + escapeHtml(c.title) + '</p>'; plain += 'Análise: ' + c.title + '\n\n'; }
+    var lines = [];
+    lines.push('<span style="color:#fa6400"><strong>CHECKLIST ESTRATÉGICO OBRIGATÓRIO</strong></span>');
+    lines.push('');
     CHECKLIST22_ITEMS.forEach(function(item) {
         var val = ck[item.key] || '';
         var obs = ck[item.key + '_obs'] || '';
         var status = val ? labels[val] || val : 'Pendente';
-        html += '<p>' + item.emoji + ' <b>' + escapeHtml(item.label) + '</b>: ' + escapeHtml(status);
-        if (obs) html += ' — ' + escapeHtml(obs);
-        html += '</p>';
-        plain += item.emoji + ' ' + item.label + ': ' + status;
-        if (obs) plain += ' — ' + obs;
-        plain += '\n';
+        var line = '<strong> &bull; ' + escapeHtml(item.label) + ':</strong> ' + escapeHtml(status);
+        if (obs) line += ' ' + escapeHtml(obs);
+        lines.push(line);
     });
+    lines.push('');
     var total = CHECKLIST22_ITEMS.length;
     var preenchidos = CHECKLIST22_ITEMS.filter(function(i) { return !!ck[i.key]; }).length;
-    html += '<p><b>Preenchimento: ' + preenchidos + '/' + total + '</b></p>';
-    plain += '\nPreenchimento: ' + preenchidos + '/' + total;
-    var htmlBlob = new Blob([html], { type: 'text/html' });
-    var textBlob = new Blob([plain], { type: 'text/plain' });
-    navigator.clipboard.write([new ClipboardItem({ 'text/html': htmlBlob, 'text/plain': textBlob })]).then(function() {
+    lines.push('<strong>Preenchimento:</strong> ' + preenchidos + '/' + total);
+    var text = lines.join('\n');
+    navigator.clipboard.writeText(text).then(function() {
         var btn = getEl('btn-copy-checklist22');
         if (btn) { var orig = btn.innerHTML; btn.textContent = 'Copiado!'; setTimeout(function() { btn.innerHTML = orig; }, 1500); }
     });
