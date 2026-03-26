@@ -55,6 +55,86 @@ function _countCases(jsonStr) {
     try { return JSON.parse(jsonStr).length; } catch (e) { return 0; }
 }
 
+/** Parse JSON array from storage; invalid data yields []. */
+function _parseJsonArray(jsonStr) {
+    if (!jsonStr) return [];
+    try {
+        var a = JSON.parse(jsonStr);
+        return Array.isArray(a) ? a : [];
+    } catch (e) { return []; }
+}
+
+/** Une análises locais e remotas por id; em conflito, mantém a cópia com lastUpdated mais recente. */
+function _mergeCaseArraysById(localArr, remoteArr) {
+    var byId = {};
+    function mergeOne(c) {
+        if (!c || c.id == null) return;
+        var id = c.id;
+        var prev = byId[id];
+        if (!prev) { byId[id] = c; return; }
+        var lu = Number(c.lastUpdated) || 0;
+        var pu = Number(prev.lastUpdated) || 0;
+        byId[id] = lu >= pu ? c : prev;
+    }
+    (localArr || []).forEach(mergeOne);
+    (remoteArr || []).forEach(mergeOne);
+    return Object.keys(byId).map(function(k) { return byId[k]; });
+}
+
+function _stableStringifyCases(arr) {
+    var sorted = arr.slice().sort(function(a, b) {
+        var ia = a.id, ib = b.id;
+        if (typeof ia === 'number' && typeof ib === 'number') return ia - ib;
+        return String(ia).localeCompare(String(ib));
+    });
+    return JSON.stringify(sorted);
+}
+
+function _mergeNotesArraysById(localArr, remoteArr) {
+    var byId = {};
+    function mergeOne(n) {
+        if (!n || n.id == null) return;
+        byId[n.id] = n;
+    }
+    (remoteArr || []).forEach(mergeOne);
+    (localArr || []).forEach(mergeOne);
+    return Object.keys(byId).map(function(k) { return byId[k]; });
+}
+
+function _mergeGroupsArrays(localArr, remoteArr) {
+    var byId = {};
+    function mergeOne(g) {
+        if (!g || g.id == null) return;
+        var id = g.id;
+        var prev = byId[id];
+        if (!prev) {
+            byId[id] = { id: g.id, name: g.name || '', caseIds: (g.caseIds || []).slice() };
+            return;
+        }
+        var ids = {};
+        (prev.caseIds || []).forEach(function(cid) { ids[cid] = true; });
+        (g.caseIds || []).forEach(function(cid) { ids[cid] = true; });
+        prev.caseIds = Object.keys(ids).map(function(x) {
+            var n = Number(x);
+            return isNaN(n) ? x : n;
+        });
+        if (g.name && !prev.name) prev.name = g.name;
+    }
+    (localArr || []).forEach(mergeOne);
+    (remoteArr || []).forEach(mergeOne);
+    return Object.keys(byId).map(function(k) { return byId[k]; });
+}
+
+function _stableStringifyById(arr, idKey) {
+    idKey = idKey || 'id';
+    var sorted = arr.slice().sort(function(a, b) {
+        var ia = a[idKey], ib = b[idKey];
+        if (typeof ia === 'number' && typeof ib === 'number') return ia - ib;
+        return String(ia).localeCompare(String(ib));
+    });
+    return JSON.stringify(sorted);
+}
+
 function _loadFromFirestore(callback) {
     if (!firebaseUid || typeof db === 'undefined') { if (callback) callback(); return; }
     db.collection('users').doc(firebaseUid).get().then(function(doc) {
@@ -62,23 +142,46 @@ function _loadFromFirestore(callback) {
             var data = doc.data();
             var localCases = localStorage.getItem('myCasesV14') || '';
             var remoteCases = data.myCasesV14 || '';
-            var localCount = _countCases(localCases);
-            var remoteCount = _countCases(remoteCases);
+            var localParsed = _parseJsonArray(localCases);
+            var remoteParsed = _parseJsonArray(remoteCases);
+            var merged = _mergeCaseArraysById(localParsed, remoteParsed);
+            var mergedStr = JSON.stringify(merged);
+            var remoteStable = _stableStringifyCases(remoteParsed);
+            var mergedStable = _stableStringifyCases(merged);
+            localStorage.setItem('myCasesV14', mergedStr);
 
-            if (remoteCount > 0 && remoteCount >= localCount) {
-                SYNC_KEYS.forEach(function(k) { if (data[k]) localStorage.setItem(k, data[k]); });
-                if (data.lastUpdated) localStorage.setItem('dp_lastSyncTs', String(data.lastUpdated.toMillis()));
-            } else if (localCount > 0 && localCount > remoteCount) {
-                var pushData = {};
-                SYNC_KEYS.forEach(function(k) { var v = localStorage.getItem(k); if (v) pushData[k] = v; });
-                if (Object.keys(pushData).length > 0) {
-                    pushData.lastUpdated = firebase.firestore.FieldValue.serverTimestamp();
-                    db.collection('users').doc(firebaseUid).set(pushData, { merge: true }).then(function() {
-                        localStorage.setItem('dp_lastSyncTs', String(Date.now()));
-                    }).catch(function(e) { console.warn('Firestore push error:', e); });
-                }
+            var localNotes = _parseJsonArray(localStorage.getItem('generalNotesList') || '');
+            var remoteNotes = _parseJsonArray(data.generalNotesList || '');
+            var mergedNotes = _mergeNotesArraysById(localNotes, remoteNotes);
+            var mergedNotesStr = JSON.stringify(mergedNotes);
+            localStorage.setItem('generalNotesList', mergedNotesStr);
+
+            var localGroups = _parseJsonArray(localStorage.getItem('myGroupsV1') || '');
+            var remoteGroups = _parseJsonArray(data.myGroupsV1 || '');
+            var mergedGroups = _mergeGroupsArrays(localGroups, remoteGroups);
+            var mergedGroupsStr = JSON.stringify(mergedGroups);
+            localStorage.setItem('myGroupsV1', mergedGroupsStr);
+
+            var notesDiffer = _stableStringifyById(mergedNotes) !== _stableStringifyById(remoteNotes);
+            var groupsDiffer = _stableStringifyById(mergedGroups) !== _stableStringifyById(remoteGroups);
+
+            if (mergedStable !== remoteStable || notesDiffer || groupsDiffer) {
+                var push = {
+                    myCasesV14: mergedStr,
+                    generalNotesList: mergedNotesStr,
+                    myGroupsV1: mergedGroupsStr,
+                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                db.collection('users').doc(firebaseUid).set(push, { merge: true }).then(function() {
+                    localStorage.setItem('dp_lastSyncTs', String(Date.now()));
+                }).catch(function(e) { console.warn('Firestore merge push error:', e); });
+            } else if (data.lastUpdated) {
+                localStorage.setItem('dp_lastSyncTs', String(data.lastUpdated.toMillis()));
             }
         }
+        setTimeout(function() {
+            try { scheduleAutoBackupToFolder(); } catch (e) {}
+        }, 12000);
         if (callback) callback();
     }).catch(function(e) { console.warn('Firestore load error:', e); if (callback) callback(); });
 }
@@ -1089,7 +1192,7 @@ function renderNotes() {
         footer.innerHTML = '<span class="note-date">' + escapeHtml(note.date || '') + '</span><button type="button" class="note-delete" data-id="' + note.id + '">Excluir</button>';
         footer.querySelector('.note-delete').addEventListener('click', () => deleteNote(note.id));
         contentDiv.addEventListener('blur', function() {
-            const n = notes.find(x => x.id === note.id); if (n) { n.text = contentDiv.innerHTML; storageSet({ 'generalNotesList': JSON.stringify(notes) }); }
+            const n = notes.find(x => x.id === note.id); if (n) { n.text = contentDiv.innerHTML; storageSet({ 'generalNotesList': JSON.stringify(notes) }, function() { scheduleAutoBackupToFolder(); }); }
         });
         contentDiv.classList.add('rich-input');
         contentDiv.addEventListener('keyup', saveSelection); contentDiv.addEventListener('mouseup', saveSelection); contentDiv.addEventListener('focus', saveSelection);
@@ -1102,13 +1205,13 @@ function addNote() {
     var now = new Date();
     var newNote = { id: Date.now(), text: input.innerHTML || text, date: now.toLocaleDateString('pt-BR') + ' ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) };
     notes.push(newNote);
-    storageSet({ 'generalNotesList': JSON.stringify(notes) });
+    storageSet({ 'generalNotesList': JSON.stringify(notes) }, function() { scheduleAutoBackupToFolder(); });
     input.innerHTML = ''; renderNotes();
 }
 function deleteNote(id) {
     if (!confirm('Apagar nota?')) return;
     notes = notes.filter(function(n) { return n.id !== id; });
-    storageSet({ 'generalNotesList': JSON.stringify(notes) });
+    storageSet({ 'generalNotesList': JSON.stringify(notes) }, function() { scheduleAutoBackupToFolder(); });
     renderNotes();
 }
 
@@ -1203,7 +1306,7 @@ function sendTechToPSAI() {
 // --- GRUPOS ---
 function saveGroups() {
     if (adminViewMode) return;
-    storageSet({ 'myGroupsV1': JSON.stringify(groups) }, function() { renderSidebar(); renderGroupsList(); });
+    storageSet({ 'myGroupsV1': JSON.stringify(groups) }, function() { renderSidebar(); renderGroupsList(); scheduleAutoBackupToFolder(); });
 }
 function openGroupView(groupId) {
     var g = groups.find(function(x) { return x.id === groupId; });
@@ -1464,7 +1567,7 @@ function saveData(silent) {
     }
     storageSet({ 'myCasesV14': JSON.stringify(cases) }, function() {
         afterSave();
-        writeBackupToFolder();
+        scheduleAutoBackupToFolder();
     });
 }
 
@@ -1659,6 +1762,12 @@ function loadCase(id) {
     renderResearch(c.researchByTopic);
     renderManagerReviews(c.managerReviews || []);
     renderChecklist22(c.checklist22 || {});
+    setVal('input-ai-project-path', c.aiProjectPath || '');
+    setVal('input-ai-repo-url', c.aiRepoUrl || '');
+    setVal('input-ai-varedura', c.aiVaredura || '');
+    setVal('input-ai-fatores', c.aiFatores || '');
+    setVal('input-ai-sugestoes', c.aiSugestoes || '');
+    setVal('input-ai-notas', c.aiNotas || '');
     switchMainPanel(c.workType || 'PSAI');
     renderTramitesList(c.ssTramites || []);
     var btnSendSGD = getEl('btn-send-obs-sgd');
@@ -1734,6 +1843,12 @@ function saveCurrentCaseMemory() {
     });
 
     c.checklist22 = readChecklist22();
+    c.aiProjectPath = getVal('input-ai-project-path') || '';
+    c.aiRepoUrl = getVal('input-ai-repo-url') || '';
+    c.aiVaredura = getVal('input-ai-varedura') || '';
+    c.aiFatores = getVal('input-ai-fatores') || '';
+    c.aiSugestoes = getVal('input-ai-sugestoes') || '';
+    c.aiNotas = getVal('input-ai-notas') || '';
 }
 
 function saveCurrentCase() { saveCurrentCaseMemory(); saveData(false); }
@@ -1776,6 +1891,18 @@ function switchMainPanel(workType) {
     if (psaiEsocialCard) psaiEsocialCard.style.display = wt === 'PSAI' ? 'block' : 'none';
     if (wt === 'PSAI') togglePsaiStatusExtras();
     if (wt === 'SS') toggleSsSaNeCodigoVisibility();
+    var showChecklistStrategic = (wt !== 'SS' && wt !== 'SAI');
+    var tabCkBtn = document.querySelector('.tabs-header .tab-btn[data-tab="tab-checklist22"]');
+    var tabCk = getEl('tab-checklist22');
+    if (tabCkBtn) tabCkBtn.style.display = showChecklistStrategic ? '' : 'none';
+    if (!showChecklistStrategic && tabCk && tabCk.classList.contains('active')) {
+        document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+        document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
+        var genBtn = getEl('btn-tab-general');
+        var genTab = getEl('tab-general');
+        if (genBtn) genBtn.classList.add('active');
+        if (genTab) genTab.classList.add('active');
+    }
 }
 
 function togglePsaiStatusExtras() {
@@ -2500,6 +2627,34 @@ function readChecklist22() {
     return data;
 }
 
+function copyAiAnalysisBlock() {
+    if (!currentId) return;
+    saveCurrentCaseMemory();
+    var parts = [];
+    parts.push('========== ANÁLISES DA IA ==========');
+    parts.push('');
+    parts.push('Referência do projeto (Cursor)');
+    parts.push('Pasta do workspace: ' + (getVal('input-ai-project-path') || '—'));
+    parts.push('URL do repositório: ' + (getVal('input-ai-repo-url') || '—'));
+    parts.push('');
+    parts.push('Varedura / resposta principal');
+    parts.push(getVal('input-ai-varedura') || '—');
+    parts.push('');
+    parts.push('Fatores e pontos de atenção');
+    parts.push(getVal('input-ai-fatores') || '—');
+    parts.push('');
+    parts.push('Sugestões e próximos passos');
+    parts.push(getVal('input-ai-sugestoes') || '—');
+    parts.push('');
+    parts.push('Notas adicionais');
+    parts.push(getVal('input-ai-notas') || '—');
+    var text = parts.join('\n');
+    navigator.clipboard.writeText(text).then(function() {
+        var btn = getEl('btn-copy-ai-analysis');
+        if (btn) { var orig = btn.innerHTML; btn.textContent = 'Copiado!'; setTimeout(function() { btn.innerHTML = orig; }, 1500); }
+    }).catch(function() { alert('Erro ao copiar.'); });
+}
+
 function copyChecklist22() {
     if (!currentId) return;
     saveCurrentCaseMemory();
@@ -2943,6 +3098,11 @@ var BACKUP_DB_NAME = 'DailyPlanBackup';
 var BACKUP_DB_STORE = 'handles';
 var VERSION_FILE_NAME = 'DailyPlanVersao.txt';
 var BACKUP_USER_KEY = 'dailyplan_backup_user';
+var _autoBackupDebounceTimer = null;
+var _lastAutoBackupMs = 0;
+var AUTO_BACKUP_DEBOUNCE_MS = 5000;
+var AUTO_BACKUP_MIN_GAP_MS = 15000;
+var AUTO_BACKUP_INTERVAL_MS = 15 * 60 * 1000;
 
 function getBackupUserName() {
     if (currentUser && currentUser.username) return currentUser.username;
@@ -2950,6 +3110,44 @@ function getBackupUserName() {
 }
 function setBackupUserName(val) {
     try { localStorage.setItem(BACKUP_USER_KEY, (val || '').trim()); } catch (e) {}
+}
+
+function buildBackupPayload() {
+    return {
+        backupUser: getBackupUserName() || 'sem_usuario',
+        exportedAt: new Date().toISOString(),
+        appVersion: APP_VERSION,
+        cases: cases,
+        groups: groups,
+        notes: notes
+    };
+}
+
+function scheduleAutoBackupToFolder() {
+    if (adminViewMode) return;
+    clearTimeout(_autoBackupDebounceTimer);
+    var delay = AUTO_BACKUP_DEBOUNCE_MS;
+    var elapsed = Date.now() - _lastAutoBackupMs;
+    if (_lastAutoBackupMs > 0 && elapsed < AUTO_BACKUP_MIN_GAP_MS) {
+        delay = AUTO_BACKUP_MIN_GAP_MS - elapsed + AUTO_BACKUP_DEBOUNCE_MS;
+    }
+    _autoBackupDebounceTimer = setTimeout(function() {
+        _autoBackupDebounceTimer = null;
+        getBackupDirHandle().then(function(h) {
+            if (!h) return;
+            writeBackupToFolder().then(function(ok) { if (ok) _lastAutoBackupMs = Date.now(); });
+        });
+    }, delay);
+}
+
+function startPeriodicAutoBackup() {
+    setInterval(function() {
+        if (adminViewMode) return;
+        getBackupDirHandle().then(function(h) {
+            if (!h) return;
+            writeBackupToFolder().then(function(ok) { if (ok) _lastAutoBackupMs = Date.now(); });
+        });
+    }, AUTO_BACKUP_INTERVAL_MS);
 }
 
 var INSTRUCOES_ATUALIZAR_TEXTO = '1. DEIXAR A PASTA SEMPRE DEFINIDA PARA A EXTENSÃO\n\n• Abra o painel da extensão DailyPlan (ícone na barra do navegador).\n• No rodapé da barra lateral, clique em "Pasta backup".\n• Escolha a pasta do OneDrive que o administrador indicou (a mesma pasta onde ficam os backups e a versão da extensão).\n• Aceite a permissão quando o navegador pedir.\n• A partir daí, a extensão usará essa pasta para backup automático e para verificar se há nova versão.\n\n2. COMO ATUALIZAR A EXTENSÃO QUANDO APARECER O AVISO\n\n• Quando aparecer o aviso "Nova versão disponível!" no topo do painel:\n• Peça ao administrador o pacote atualizado da extensão (pasta ou arquivo .zip).\n• No Chrome, abra chrome://extensions\n• Ative "Modo desenvolvedor" (canto superior direito).\n• Se a extensão DailyPlan já estiver instalada: clique em "Atualizar" no card da extensão OU remova a extensão e em seguida arraste a nova pasta (ou descompacte o .zip e arraste a pasta) para a página chrome://extensions.\n• Se for a primeira instalação: arraste a pasta da extensão para a página chrome://extensions.\n• Feche e reabra o painel da extensão para usar a nova versão.';
@@ -3046,7 +3244,8 @@ function setBackupFolder() {
         return setBackupDirHandle(handle).then(function() {
             try { localStorage.setItem('backupFolderName', handle.name); } catch (e) {}
             updateBackupFolderLabel(handle.name);
-            alert('Pasta de backup definida: "' + handle.name + '". A partir de agora, os backups serão gravados nela.');
+            setTimeout(function() { scheduleAutoBackupToFolder(); }, 400);
+            alert('Pasta de backup definida: "' + handle.name + '". A partir de agora, os backups serão gravados nela automaticamente.');
         });
     }).catch(function(err) {
         if (err.name !== 'AbortError') alert('Não foi possível definir a pasta: ' + (err.message || err));
@@ -3054,7 +3253,6 @@ function setBackupFolder() {
 }
 
 function writeBackupToFolder() {
-    if (typeof showDirectoryPicker === 'undefined') return Promise.resolve(false);
     return getBackupDirHandle().then(function(handle) {
         if (!handle) return false;
         var checkPerm = (handle.queryPermission && handle.queryPermission({ mode: 'readwrite' })) || Promise.resolve('granted');
@@ -3068,7 +3266,7 @@ function writeBackupToFolder() {
         var user = getBackupUserName() || 'sem_usuario';
         var safeUser = (user + '').replace(/[^a-zA-Z0-9_-]/g, '_');
         var name = 'backup_' + safeUser + '.json';
-        var payload = { backupUser: user, exportedAt: new Date().toISOString(), cases: cases, groups: groups };
+        var payload = buildBackupPayload();
         return handle.getFileHandle(name, { create: true }).then(function(fileHandle) {
             return fileHandle.createWritable().then(function(writable) {
                 writable.write(JSON.stringify(payload));
@@ -3080,7 +3278,7 @@ function writeBackupToFolder() {
 
 function exportData() {
     var user = getBackupUserName() || 'sem_usuario';
-    var payload = { backupUser: user, exportedAt: new Date().toISOString(), cases: cases, groups: groups };
+    var payload = buildBackupPayload();
     var jsonStr = JSON.stringify(payload);
     var encoded = btoa(unescape(encodeURIComponent(jsonStr)));
     var blob = new Blob([encoded], { type: 'application/octet-stream' });
@@ -3095,7 +3293,7 @@ function exportData() {
 }
 function saveBackupToOneDrive() {
     var user = getBackupUserName() || 'sem_usuario';
-    var payload = { backupUser: user, exportedAt: new Date().toISOString(), cases: cases, groups: groups };
+    var payload = buildBackupPayload();
     var jsonStr = JSON.stringify(payload);
     var encoded = btoa(unescape(encodeURIComponent(jsonStr)));
     if (typeof showSaveFilePicker === 'undefined') { exportData(); alert('Seu navegador não suporta "escolher pasta". O backup foi baixado; salve-o manualmente na pasta do OneDrive.'); return; }
@@ -3448,6 +3646,11 @@ document.addEventListener('DOMContentLoaded', function() {
         init();
         showUserBar();
         startReminderInterval();
+        startPeriodicAutoBackup();
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState !== 'visible') return;
+            setTimeout(function() { scheduleAutoBackupToFolder(); }, 2000);
+        });
         if (!currentId) {
             var ca = getEl('content-area');
             var es = getEl('empty-state');
@@ -3611,8 +3814,8 @@ document.addEventListener('DOMContentLoaded', function() {
         'btn-go': openPsaiLink, 
 'btn-add-sa': addSaFromForm,
         'btn-add-manager': () => addManagerReviewRow(),
-        'btn-save-gen': saveCurrentCase, 'btn-save-tech': saveCurrentCase, 'btn-save-checklist22': saveCurrentCase, 'btn-delete-gen': deleteCase, 'btn-delete-tech': deleteCase,
-        'btn-copy-tech': copyTechnicalData, 'btn-copy-checklist22': copyChecklist22, 'btn-copy-contexto': copyContextoResumoContent, 'btn-export-single-gen': exportSingleCase, 'btn-export-single-tech': exportSingleCase,
+        'btn-save-gen': saveCurrentCase, 'btn-save-tech': saveCurrentCase, 'btn-save-checklist22': saveCurrentCase, 'btn-save-ai-analysis': saveCurrentCase, 'btn-delete-gen': deleteCase, 'btn-delete-tech': deleteCase,
+        'btn-copy-tech': copyTechnicalData, 'btn-copy-checklist22': copyChecklist22, 'btn-copy-ai-analysis': copyAiAnalysisBlock, 'btn-copy-contexto': copyContextoResumoContent, 'btn-export-single-gen': exportSingleCase, 'btn-export-single-tech': exportSingleCase,
         'btn-ler-ss': function() { setVal('ss-html-paste', ''); toggleModal('modal-ler-ss', true); },
         'close-ler-ss': () => toggleModal('modal-ler-ss', false),
         'btn-ss-upload-html': function() { var f = getEl('file-ss-html'); if (f) f.click(); },
