@@ -872,21 +872,12 @@
 
                 <div id="tab-ai-analysis" class="tab-content">
                     <div style="background:rgba(139,92,246,0.1); border:1px solid rgba(139,92,246,0.3); border-radius:8px; padding:12px 14px; margin-bottom:14px; font-size:11px; line-height:1.65; color:var(--text-primary);">
-                        <div style="font-weight:700; margin-bottom:6px;">Dica — Cursor e exportação</div>
-                        <div style="color:var(--text-secondary);">Você pode salvar esta análise no DailyPlan com <strong>Salvar Agora</strong> abaixo. Para o assistente do <strong>Cursor</strong> revisar o caso, use o botão <strong>Exportar este</strong> na guia <strong>Visão Geral</strong> ou <strong>Detalhamento Técnico</strong>, importe o JSON no projeto (ou arraste para o chat) e peça a varedura ou o resumo. O navegador <strong>não abre</strong> a pasta do Cursor sozinho; use os campos abaixo só como <strong>lembrete</strong> e para montar o pacote ao importar de volta.</div>
-                    </div>
-                    <div class="card" style="margin-bottom:12px;">
-                        <h4 style="margin:0 0 10px; font-size:12px; font-weight:700; color:var(--tr-orange); text-transform:uppercase; letter-spacing:0.3px;">Onde está o projeto no Cursor</h4>
-                        <p class="section-hint" style="margin:0 0 12px;">Registre onde você trabalha a análise no Cursor (para alinhar export/import). Opcional, mas ajuda a não perder o fio ao colar de volta no DailyPlan.</p>
-                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:10px;">
-                            <div><label class="ss-label" for="input-ai-project-path">Pasta do workspace (caminho local)</label><input type="text" id="input-ai-project-path" class="sync-input" style="width:100%; margin:6px 0 0; padding:8px 10px; font-size:12px;" placeholder="Ex.: C:\Users\...\DailyPlanExt" autocomplete="off"></div>
-                            <div><label class="ss-label" for="input-ai-repo-url">URL do repositório (opcional)</label><input type="text" id="input-ai-repo-url" class="sync-input" style="width:100%; margin:6px 0 0; padding:8px 10px; font-size:12px;" placeholder="Ex.: https://github.com/org/repo" autocomplete="off"></div>
-                        </div>
-                        <p class="section-hint" style="margin:0;">Esses dados entram no <strong>Copiar bloco da IA</strong> e no backup JSON do caso.</p>
+                        <div style="font-weight:700; margin-bottom:6px;">Dica</div>
+                        <div style="color:var(--text-secondary);">Use <strong>Salvar Agora</strong> para guardar o que colar aqui. <strong>Copiar bloco da IA</strong> monta um texto único para colar onde precisar.</div>
                     </div>
                     <div class="card" style="margin-bottom:12px;">
                         <label class="ss-label" for="input-ai-varedura">Varedura / resposta principal da IA</label>
-                        <p class="section-hint" style="margin:0 0 8px;">Cole aqui o texto principal que a IA gerou (ex.: varedura do Cursor).</p>
+                        <p class="section-hint" style="margin:0 0 8px;">Cole aqui o texto principal gerado pela análise externa.</p>
                         <textarea id="input-ai-varedura" class="ss-textarea" style="min-height:120px;" placeholder="Cole a resposta da IA..."></textarea>
                     </div>
                     <div class="card" style="margin-bottom:12px;">

@@ -1762,8 +1762,6 @@ function loadCase(id) {
     renderResearch(c.researchByTopic);
     renderManagerReviews(c.managerReviews || []);
     renderChecklist22(c.checklist22 || {});
-    setVal('input-ai-project-path', c.aiProjectPath || '');
-    setVal('input-ai-repo-url', c.aiRepoUrl || '');
     setVal('input-ai-varedura', c.aiVaredura || '');
     setVal('input-ai-fatores', c.aiFatores || '');
     setVal('input-ai-sugestoes', c.aiSugestoes || '');
@@ -1843,8 +1841,6 @@ function saveCurrentCaseMemory() {
     });
 
     c.checklist22 = readChecklist22();
-    c.aiProjectPath = getVal('input-ai-project-path') || '';
-    c.aiRepoUrl = getVal('input-ai-repo-url') || '';
     c.aiVaredura = getVal('input-ai-varedura') || '';
     c.aiFatores = getVal('input-ai-fatores') || '';
     c.aiSugestoes = getVal('input-ai-sugestoes') || '';
@@ -2632,10 +2628,6 @@ function copyAiAnalysisBlock() {
     saveCurrentCaseMemory();
     var parts = [];
     parts.push('========== ANÁLISES DA IA ==========');
-    parts.push('');
-    parts.push('Referência do projeto (Cursor)');
-    parts.push('Pasta do workspace: ' + (getVal('input-ai-project-path') || '—'));
-    parts.push('URL do repositório: ' + (getVal('input-ai-repo-url') || '—'));
     parts.push('');
     parts.push('Varedura / resposta principal');
     parts.push(getVal('input-ai-varedura') || '—');
