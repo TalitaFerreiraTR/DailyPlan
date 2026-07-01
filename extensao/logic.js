@@ -4,7 +4,7 @@ let notes = [];
 let groups = []; // { id, name, caseIds: [] }
 let currentId = null;
 let currentGroupId = null;
-let workTypeFilter = 'all'; // 'all' | 'PSAI' | 'SS' | 'SAI' | 'NE'
+let workTypeFilter = 'all'; // 'all' | 'PSAI' | 'SS' | 'SAI'
 let savedRange = null;
 let savedFocusElement = null;
 let autoSaveTimer = null;
@@ -173,7 +173,11 @@ function init() {
             if (changes.myCasesV14 && changes.myCasesV14.newValue) { try { cases = JSON.parse(changes.myCasesV14.newValue); } catch (e) {} renderSidebar(); }
             if (changes.myGroupsV1 && changes.myGroupsV1.newValue) { try { groups = JSON.parse(changes.myGroupsV1.newValue); } catch (e) {} renderSidebar(); renderGroupsList(); }
             if (changes.generalNotesList && changes.generalNotesList.newValue) { try { notes = JSON.parse(changes.generalNotesList.newValue); } catch (e) {} renderNotes(); }
-            if (changes.pendingSSHtml || changes.pendingSSCaseId) tryApplyPendingSS();
+            // Só reaplicar quando o injector gravar pendência nova; ao remover (newValue vazio) não chamar — evita triplicar efeitos
+            var pHtml = changes.pendingSSHtml;
+            var pId = changes.pendingSSCaseId;
+            var hasNewPending = (pHtml && pHtml.newValue) || (pId && pId.newValue);
+            if (hasNewPending) tryApplyPendingSS();
         });
     } else {
         window.addEventListener('storage', function(e) {
@@ -594,7 +598,6 @@ function statusForCase(c) {
     var wt = c.workType || 'PSAI';
     if (wt === 'SAI') return c.saiStatus || c.status || '';
     if (wt === 'SS') return c.ssStatus || c.status || '';
-    if (wt === 'NE') return c.neStatus || c.status || '';
     return c.status || '';
 }
 function renderSidebar() {
@@ -649,6 +652,12 @@ function loadCase(id) {
     currentId = id;
     var c = cases.find(function(x) { return x.id === id; });
     if (!c) return;
+    var migratedNe = false;
+    if (c.workType === 'NE') {
+        migratedNe = true;
+        if (c.neStatus && !c.status) c.status = c.neStatus;
+        c.workType = 'PSAI';
+    }
     var emptyState = getEl('empty-state');
     var contentArea = getEl('content-area');
     if (emptyState) emptyState.classList.add('hidden');
@@ -685,13 +694,6 @@ function loadCase(id) {
     setVal('input-ss-status', c.ssStatus || 'Em análise'); setVal('input-ss-complexidade', c.ssComplexidade || 'Média');
     setVal('input-ss-proximo-passo', c.ssProximoPasso || ''); setVal('input-ss-apoio', c.ssApoio || ''); setVal('input-ss-sa-ne-codigo', c.ssSaNeCodigo || ''); setVal('input-ss-validado-com', c.ssValidadoCom || ''); setVal('input-ss-validado-data', c.ssValidadoData || '');
     setCheck('input-ss-banco-cliente', c.ssBancoCliente); setVal('input-ss-banco-cliente-conteudo', c.ssBancoClienteConteudo || '');
-    if (c.workType === 'NE') {
-        setVal('input-ne-title', c.title || '');
-        setVal('input-ne-type', c.caseType || '');
-        setVal('input-ne-status', c.neStatus || '');
-        setVal('input-ne-priority', c.priority || 'null');
-        setVal('input-ne-deadline', c.deadline || '');
-    }
     toggleSsSaNeCodigoVisibility();
     toggleBancoClienteConteudoVisibility();
     var tramitesBadge = getEl('ss-tramites-badge');
@@ -702,6 +704,12 @@ function loadCase(id) {
     setHTML('input-solution', c.solution);
 
     if (!c.researchByTopic && c.researchLinks) { c.researchByTopic = { saiLiberadas: [], ne: [], outros: (c.researchLinks || []).slice() }; }
+    c.researchByTopic = c.researchByTopic || { saiLiberadas: [], ne: [], outros: [] };
+    var neLegacy = c.researchByTopic.ne;
+    if (neLegacy && neLegacy.length) {
+        c.researchByTopic.outros = neLegacy.slice().concat(c.researchByTopic.outros || []);
+        c.researchByTopic.ne = [];
+    }
     renderResearch(c.researchByTopic);
     renderManagerReviews(c.managerReviews || []);
     switchMainPanel(c.workType || 'PSAI');
@@ -712,6 +720,7 @@ function loadCase(id) {
     if (btnSendPSAI) btnSendPSAI.style.display = (getPsaiCode(c.psaiLink) && c.workType === 'PSAI') ? '' : 'none';
     analyzeData(id);
     renderSidebar();
+    if (migratedNe) saveData(true);
 }
 
 function saveCurrentCaseMemory() {
@@ -740,14 +749,7 @@ function saveCurrentCaseMemory() {
     c.saiChangeLevel = getVal('input-sai-level');
     var scoreVal = getVal('input-sai-score'); c.saiScore = scoreVal === '' ? '' : (isNaN(parseFloat(scoreVal)) ? '' : parseFloat(scoreVal)); c.saiStatus = getVal('input-sai-status');
     c.saiData = getVal('input-sai-data'); c.saiPriority = getVal('input-sai-priority'); c.saiPrazo = getVal('input-sai-prazo'); c.saiAssunto = getVal('input-sai-assunto'); c.saiObs = getVal('input-sai-obs');
-    var psaiCode = getPsaiCode(getVal('input-psai-link')); c.psaiLink = psaiCode ? ('https://sgd.dominiosistemas.com.br/sgsa/faces/psai.html?psai=' + psaiCode) : ''; c.psaiNivel = getVal('input-psai-nivel'); c.psaiData = getVal('input-psai-data'); if (c.workType !== 'NE') c.status = getVal('input-status'); c.priority = getVal('input-priority'); c.deadline = getVal('input-deadline');
-    if (c.workType === 'NE') {
-        c.title = getVal('input-ne-title') || '';
-        c.caseType = getVal('input-ne-type') || '';
-        c.neStatus = getVal('input-ne-status') || '';
-        c.priority = getVal('input-ne-priority') || 'null';
-        c.deadline = getVal('input-ne-deadline') || '';
-    }
+    var psaiCode = getPsaiCode(getVal('input-psai-link')); c.psaiLink = psaiCode ? ('https://sgd.dominiosistemas.com.br/sgsa/faces/psai.html?psai=' + psaiCode) : ''; c.psaiNivel = getVal('input-psai-nivel'); c.psaiData = getVal('input-psai-data'); c.status = getVal('input-status'); c.priority = getVal('input-priority'); c.deadline = getVal('input-deadline');
     c.ssNumero = getVal('input-ss-numero'); c.ssData = getVal('input-ss-data');
     c.ssSubtopic = getVal('input-ss-subtopico'); c.ssAssunto = getVal('input-ss-assunto'); c.ssProblema = getVal('input-ss-problema'); c.ssPassos = getVal('input-ss-passos');
     c.ssDetalheTecnico = getVal('input-ss-detalhe-tecnico');
@@ -760,7 +762,7 @@ function saveCurrentCaseMemory() {
     c.solution = getHTML('input-solution');
 
     c.researchByTopic = c.researchByTopic || { saiLiberadas: [], ne: [], outros: [] };
-    ['sai', 'ne', 'outros'].forEach(function(topic) {
+    ['sai', 'outros'].forEach(function(topic) {
         var key = RESEARCH_TOPIC_KEYS[topic];
         c.researchByTopic[key] = [];
         document.querySelectorAll('#research-container-' + topic + ' .link-row').forEach(function(row) {
@@ -769,6 +771,7 @@ function saveCurrentCaseMemory() {
             if (link || desc) c.researchByTopic[key].push({ link: link, desc: desc });
         });
     });
+    c.researchByTopic.ne = [];
 
     c.managerReviews = [];
     document.querySelectorAll('#manager-reviews-container .manager-row').forEach(function(row) {
@@ -781,18 +784,28 @@ function saveCurrentCaseMemory() {
 
 function saveCurrentCase() { saveCurrentCaseMemory(); saveData(false); }
 
+var _pendingSsApplyLock = false;
+
 /** Se houver HTML pendente do botão flutuante "Ler SS", carrega o caso e preenche todos os campos. */
 function tryApplyPendingSS() {
     storageGet(['pendingSSHtml', 'pendingSSCaseId', 'myCasesV14'], function(r) {
         if (!r.pendingSSHtml || !r.pendingSSCaseId) return;
-        if (r.myCasesV14) { try { cases = JSON.parse(r.myCasesV14); } catch (e) {} }
+        if (_pendingSsApplyLock) return;
+        _pendingSsApplyLock = true;
+        var html = r.pendingSSHtml;
         var id = r.pendingSSCaseId;
-        if (!cases.some(function(c) { return c.id === id; })) return;
-        loadCase(id);
-        var data = parseSSHtml(r.pendingSSHtml);
-        applyParsedSS(data);
-        storageRemove(['pendingSSHtml', 'pendingSSCaseId']);
-        renderSidebar();
+        storageRemove(['pendingSSHtml', 'pendingSSCaseId'], function() {
+            try {
+                if (r.myCasesV14) { try { cases = JSON.parse(r.myCasesV14); } catch (e) {} }
+                if (!cases.some(function(c) { return c.id === id; })) return;
+                loadCase(id);
+                var data = parseSSHtml(html);
+                applyParsedSS(data, { force: true });
+                renderSidebar();
+            } finally {
+                _pendingSsApplyLock = false;
+            }
+        });
     });
 }
 
@@ -802,7 +815,6 @@ function switchMainPanel(workType) {
     var panel = getEl('psai-painel');
     if (wt === 'SS') panel = getEl('ss-painel');
     else if (wt === 'SAI') panel = getEl('sai-painel');
-    else if (wt === 'NE') panel = getEl('ne-painel');
     if (panel) panel.classList.add('active');
     var ctxWrap = getEl('contexto-resumo-wrapper');
     if (ctxWrap) ctxWrap.style.display = (wt === 'PSAI' || wt === 'SS') ? 'block' : 'none';
@@ -914,12 +926,12 @@ function parseTramitesFromDoc(doc) {
     if (!anchors.length) return out;
     var lines = [];
     for (var i = 0; i < anchors.length; i++) {
-        var table = anchors[i].closest('table.tableVisualizacao');
+        var table = anchors[i].closest('table.tableVisualizacao') || anchors[i].closest('table[class*="tableVisualizacao"]');
         if (!table) continue;
         var dateStr = '';
         var userStr = '';
         var descStr = '';
-        var destaqueTds = table.querySelectorAll('td.tableVisualizacaoDestaque');
+        var destaqueTds = table.querySelectorAll('td.tableVisualizacaoDestaque, td[class*="tableVisualizacaoDestaque"]');
         for (var d = 0; d < destaqueTds.length; d++) {
             var txt = getElementText(destaqueTds[d]);
             if (txt.indexOf('Data:') !== -1) {
@@ -937,7 +949,7 @@ function parseTramitesFromDoc(doc) {
         }
         var justifyDiv = table.querySelector('div[align="justify"]');
         if (justifyDiv) descStr = getElementTextWithBreaks(justifyDiv);
-        else { var tdHtml = table.querySelector('td.tableVisualizacaoHtml'); if (tdHtml) descStr = getElementTextWithBreaks(tdHtml); }
+        else { var tdHtml = table.querySelector('td.tableVisualizacaoHtml, td[class*="tableVisualizacaoHtml"]'); if (tdHtml) descStr = getElementTextWithBreaks(tdHtml); }
         descStr = (descStr || '').trim();
         out.tramites.push({ date: dateStr, user: userStr, desc: descStr });
         var block = (dateStr ? '[' + dateStr + ']' : '') + (dateStr && (userStr || descStr) ? ' - ' : '') + (userStr ? '[' + userStr + ']:' : '') + (userStr && descStr ? '\n' : '') + (descStr || '—');
@@ -962,7 +974,7 @@ function parseSSHtml(html) {
     out.tramitesCount = tramitesData.count;
     out.tramitesSummary = tramitesData.summary;
     out.tramites = tramitesData.tramites;
-    var allTd = doc.querySelectorAll('td.tableVisualizacaoField');
+    var allTd = doc.querySelectorAll('td.tableVisualizacaoField, td[class*="tableVisualizacaoField"]');
     for (var i = 0; i < allTd.length; i++) {
         var txt = getElementText(allTd[i]);
         if (!out.numero && txt.indexOf('Número:') === 0) { var m = txt.match(/Número:\s*(\d+)/); if (m) out.numero = m[1]; }
@@ -977,12 +989,12 @@ function parseSSHtml(html) {
         var dataFromRaw = html.match(/Data:[\s\S]*?(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
         if (dataFromRaw) out.ssData = parsePsaiDateToISO(dataFromRaw[1] + '/' + dataFromRaw[2] + '/' + dataFromRaw[3]);
     }
-    var destaque = doc.querySelectorAll('td.tableVisualizacaoDestaque');
+    var destaque = doc.querySelectorAll('td.tableVisualizacaoDestaque, td[class*="tableVisualizacaoDestaque"]');
     for (var di = 0; di < destaque.length; di++) {
         var dtxt = getElementText(destaque[di]);
         if (dtxt.indexOf('Situação:') !== -1 && !out.tipo) { out.tipo = dtxt.replace(/^\s*Situação:\s*/i, '').trim(); break; }
     }
-    var htmlCells = doc.querySelectorAll('td.tableVisualizacaoHtml');
+    var htmlCells = doc.querySelectorAll('td.tableVisualizacaoHtml, td[class*="tableVisualizacaoHtml"]');
     for (var j = 0; j < destaque.length; j++) {
         var label = getElementText(destaque[j]);
         if (label.indexOf('Assunto:') !== -1 && htmlCells[j] !== undefined) { out.assunto = getElementText(htmlCells[j]); continue; }
@@ -1052,7 +1064,7 @@ function parseSSHtml(html) {
             if (tdDet) out.detalheTecnico = getElementTextWithBreaks(tdDet);
         }
     }
-    var colspanCells = doc.querySelectorAll('td.tableVisualizacaoHtml[colspan="3"]');
+    var colspanCells = doc.querySelectorAll('td.tableVisualizacaoHtml[colspan="3"], td[class*="tableVisualizacaoHtml"][colspan="3"]');
     if (!out.detalheTecnico) {
         for (var k = 0; k < colspanCells.length; k++) {
             var t = getElementTextWithBreaks(colspanCells[k]);
@@ -1185,31 +1197,80 @@ function _ssEmpty(val) {
     return false;
 }
 
-function applyParsedSS(data) {
+function applyParsedSS(data, opts) {
     if (!currentId) return;
     var c = cases.find(function(x) { return x.id === currentId; });
     if (!c) return;
+    var force = opts && opts.force;
     var titleParts = [];
-    if (data.numero && _ssEmpty(c.ssNumero)) { c.ssNumero = data.numero; setVal('input-ss-numero', data.numero); }
-    if (data.ssData && _ssEmpty(c.ssData)) { c.ssData = data.ssData; setVal('input-ss-data', data.ssData); }
-    if (data.subtopic && _ssEmpty(c.ssSubtopic)) { c.ssSubtopic = data.subtopic; setVal('input-ss-subtopico', data.subtopic); }
-    if (data.tipo !== undefined && _ssEmpty(c.ssTipo)) c.ssTipo = data.tipo;
+
+    function applyNumero() {
+        if (force ? data.numero !== undefined : (data.numero && _ssEmpty(c.ssNumero))) {
+            c.ssNumero = data.numero || '';
+            setVal('input-ss-numero', c.ssNumero);
+        }
+    }
+    function applySsData() {
+        if (force ? data.ssData !== undefined : (data.ssData && _ssEmpty(c.ssData))) {
+            c.ssData = data.ssData || '';
+            setVal('input-ss-data', c.ssData);
+        }
+    }
+    function applySubtopic() {
+        if (force ? data.subtopic !== undefined : (data.subtopic && _ssEmpty(c.ssSubtopic))) {
+            c.ssSubtopic = data.subtopic || '';
+            setVal('input-ss-subtopico', c.ssSubtopic);
+        }
+    }
+    function applyTipo() {
+        if (force ? data.tipo !== undefined : (data.tipo !== undefined && _ssEmpty(c.ssTipo))) {
+            c.ssTipo = data.tipo || '';
+        }
+    }
+    applyNumero();
+    applySsData();
+    applySubtopic();
+    applyTipo();
     titleParts = [c.ssNumero, c.ssTipo, c.ssSubtopic].filter(Boolean);
     if (titleParts.length) { var autoTitle = titleParts.join(' · '); setVal('input-title', autoTitle); c.title = autoTitle; }
-    if (data.assunto && _ssEmpty(c.ssAssunto)) { c.ssAssunto = data.assunto; setVal('input-ss-assunto', data.assunto); }
-    if (data.problema && _ssEmpty(c.ssProblema)) { c.ssProblema = data.problema; setVal('input-ss-problema', data.problema); }
-    if (data.passos && _ssEmpty(c.ssPassos)) { c.ssPassos = data.passos; setVal('input-ss-passos', data.passos); }
-    if (data.bancoCliente !== undefined) { c.ssBancoCliente = !!data.bancoCliente; setCheck('input-ss-banco-cliente', data.bancoCliente); }
-    if (data.bancoClienteConteudo != null && _ssEmpty(c.ssBancoClienteConteudo)) { c.ssBancoClienteConteudo = data.bancoClienteConteudo; setVal('input-ss-banco-cliente-conteudo', data.bancoClienteConteudo); }
+
+    if (force ? data.assunto !== undefined : (data.assunto && _ssEmpty(c.ssAssunto))) {
+        c.ssAssunto = data.assunto || '';
+        setVal('input-ss-assunto', c.ssAssunto);
+    }
+    if (force ? data.problema !== undefined : (data.problema && _ssEmpty(c.ssProblema))) {
+        c.ssProblema = data.problema || '';
+        setVal('input-ss-problema', c.ssProblema);
+    }
+    if (force ? data.passos !== undefined : (data.passos && _ssEmpty(c.ssPassos))) {
+        c.ssPassos = data.passos || '';
+        setVal('input-ss-passos', c.ssPassos);
+    }
+    if (data.bancoCliente !== undefined) {
+        c.ssBancoCliente = !!data.bancoCliente;
+        setCheck('input-ss-banco-cliente', data.bancoCliente);
+    }
+    if (force ? data.bancoClienteConteudo !== undefined : (data.bancoClienteConteudo != null && _ssEmpty(c.ssBancoClienteConteudo))) {
+        c.ssBancoClienteConteudo = data.bancoClienteConteudo || '';
+        setVal('input-ss-banco-cliente-conteudo', c.ssBancoClienteConteudo);
+    }
     toggleBancoClienteConteudoVisibility();
-    if (data.detalheTecnico != null && _ssEmpty(c.ssDetalheTecnico)) { c.ssDetalheTecnico = data.detalheTecnico; setVal('input-ss-detalhe-tecnico', data.detalheTecnico); }
-    if (data.tramites && data.tramites.length && _ssEmpty(c.ssTramites)) {
-        c.ssTramites = data.tramites.slice();
-        c.ssTramitesCount = data.tramites.length;
-        c.ssResumoAI = (data.tramitesSummary || '').trim() || data.tramites.map(function(t) { return (t.date ? t.date + ' - ' : '') + (t.user ? t.user + ': ' : '') + (t.desc || '—'); }).join('\n');
-        renderTramitesList(c.ssTramites);
-    } else renderTramitesList(c.ssTramites || []);
-    if (data.tramitesCount != null && (c.ssTramitesCount == null || c.ssTramitesCount === undefined)) c.ssTramitesCount = data.tramitesCount;
+    if (force ? data.detalheTecnico !== undefined : (data.detalheTecnico != null && _ssEmpty(c.ssDetalheTecnico))) {
+        c.ssDetalheTecnico = data.detalheTecnico || '';
+        setVal('input-ss-detalhe-tecnico', c.ssDetalheTecnico);
+    }
+
+    if (force ? data.tramites !== undefined : (data.tramites && data.tramites.length && _ssEmpty(c.ssTramites))) {
+        c.ssTramites = data.tramites ? data.tramites.slice() : [];
+        c.ssTramitesCount = data.tramitesCount != null ? data.tramitesCount : (c.ssTramites ? c.ssTramites.length : 0);
+        c.ssResumoAI = (data.tramitesSummary || '').trim() || (c.ssTramites && c.ssTramites.length ? c.ssTramites.map(function(t) { return (t.date ? t.date + ' - ' : '') + (t.user ? t.user + ': ' : '') + (t.desc || '—'); }).join('\n') : '');
+        renderTramitesList(c.ssTramites || []);
+    } else {
+        renderTramitesList(c.ssTramites || []);
+    }
+    if (!force && data.tramitesCount != null && (c.ssTramitesCount == null || c.ssTramitesCount === undefined)) c.ssTramitesCount = data.tramitesCount;
+    if (force && data.tramitesCount != null) c.ssTramitesCount = data.tramitesCount;
+
     var badge = getEl('ss-tramites-badge');
     if (badge) {
         var n = c.ssTramitesCount != null ? c.ssTramitesCount : 0;
@@ -1219,7 +1280,7 @@ function applyParsedSS(data) {
     if (data.sscs && data.sscs.length) {
         c.links = (c.links || []).slice();
         data.sscs.forEach(function(item) {
-            if (item.code && !c.links.some(function(l) { return l.code === item.code; })) c.links.push({ code: item.code, link: item.link || '', desc: item.desc || '' });
+            if (item.code && !c.links.some(function(l) { return String(l.code) === String(item.code); })) c.links.push({ code: String(item.code).trim(), link: item.link || '', desc: item.desc || '' });
         });
     }
     updateSsTitleAuto(c);
@@ -1308,10 +1369,10 @@ function addSaFromForm() {
     analyzeData(currentId);
 }
 
-var RESEARCH_TOPIC_KEYS = { sai: 'saiLiberadas', ne: 'ne', outros: 'outros' };
+var RESEARCH_TOPIC_KEYS = { sai: 'saiLiberadas', outros: 'outros' };
 function renderResearch(topics) {
     topics = topics || { saiLiberadas: [], ne: [], outros: [] };
-    ['sai', 'ne', 'outros'].forEach(function(topic) {
+    ['sai', 'outros'].forEach(function(topic) {
         var key = RESEARCH_TOPIC_KEYS[topic];
         var container = getEl('research-container-' + topic);
         if (!container) return;
@@ -1379,6 +1440,7 @@ function openCalendar() {
 
 function getCaseDisplayId(c) {
     var wt = c.workType || 'PSAI';
+    if (wt === 'NE') wt = 'PSAI';
     var code = '';
     if (wt === 'SS') {
         if (c.ssNumero) code = String(c.ssNumero).replace(/\D/g, '');
@@ -1386,8 +1448,6 @@ function getCaseDisplayId(c) {
     } else if (wt === 'SAI') {
         if (c.saiGenerated) code = String(c.saiGenerated).replace(/\D/g, '');
         if (!code && c.psaiLink) { var mSai = c.psaiLink.match(/[?&]sai=(\d+)/i); if (mSai) code = mSai[1]; }
-    } else if (wt === 'NE') {
-        code = String(c.id).slice(-6);
     } else {
         if (c.psaiLink) { var m = c.psaiLink.match(/(?:psai|id)=(\d+)/i) || c.psaiLink.match(/(\d{5,})/); if (m) code = m[1]; }
     }
@@ -1547,11 +1607,11 @@ function copyTechnicalData() {
     }
 
     var researchByTopic = c.researchByTopic || { saiLiberadas: [], ne: [], outros: [] };
+    var outrosMerged = (researchByTopic.outros || []).slice();
+    if ((researchByTopic.ne || []).length) outrosMerged = (researchByTopic.ne || []).concat(outrosMerged);
     var saiHtml = mapLinks(researchByTopic.saiLiberadas, false);
-    var neHtml = mapLinks(researchByTopic.ne, false);
-    var outrosHtml = mapLinks(researchByTopic.outros, true);
+    var outrosHtml = mapLinks(outrosMerged, true);
     if (!saiHtml) saiHtml = '•  – ';
-    if (!neHtml) neHtml = '•  – ';
     if (!outrosHtml) outrosHtml = '•  – ';
 
     var reviewsForAvaliado = c.managerReviews && c.managerReviews.length ? c.managerReviews : [];
@@ -1590,12 +1650,11 @@ function copyTechnicalData() {
     var techHtml = `<div style="margin-bottom:16px;"><span style="color:#fa6400"><strong>DETALHAMENTO TÉCNICO</strong></span><br>
   <strong>Empresa de teste:</strong><br>${empresaTesteHtml}<br><br>
   <strong>Testes realizados:</strong><br>${formData.testesRealizados}<br><br>
-  <strong>Pesquisas &amp; Referências:</strong><br><strong>SAI's liberadas:</strong><br>${saiHtml}<br><strong>NE:</strong><br>${neHtml}<br><strong>Outros links:</strong><br>${outrosHtml}<br><br>
+  <strong>Pesquisas &amp; Referências:</strong><br><strong>SAI's liberadas:</strong><br>${saiHtml}<br><strong>Outros links:</strong><br>${outrosHtml}<br><br>
   <strong>Avaliado com:</strong><br>${avaliadoHtml}<br><br><strong>Solução final:</strong><br>${formData.solucaoFinal}</div>`;
 
     var plainPesquisas = "SAI's liberadas:\n" + (researchByTopic.saiLiberadas || []).map(function(r) { return '• ' + (r.link || '') + (r.desc ? ' – ' + r.desc : ''); }).join('\n') +
-        "\nNE:\n" + (researchByTopic.ne || []).map(function(r) { return '• ' + (r.link || '') + (r.desc ? ' – ' + r.desc : ''); }).join('\n') +
-        "\nOutros links:\n" + (researchByTopic.outros || []).map(function(r) { return '• ' + (r.link || '') + (r.desc ? ' – ' + r.desc : ''); }).join('\n');
+        "\nOutros links:\n" + outrosMerged.map(function(r) { return '• ' + (r.link || '') + (r.desc ? ' – ' + r.desc : ''); }).join('\n');
     var plainAvaliado = reviewsForAvaliado.length ? reviewsForAvaliado.map(function(r) {
         return '• [' + formatDateDDMMAAAA(r.date) + '] Avaliado com: ' + (r.who || '') + (r.reason ? ' – ' + r.reason : '');
     }).join('\n') : (validadoComVal ? '• [' + formatDateDDMMAAAA(new Date()) + '] Avaliado com: ' + validadoComVal : '');
@@ -1610,12 +1669,11 @@ function copyTechnicalData() {
         return (list || []).map(function(r) { return '• ' + (r.link || '') + (r.desc ? ' – ' + r.desc : ''); }).join('<br>');
     }
     var saiPlain = linkLinePlain(researchByTopic.saiLiberadas) || '•  – ';
-    var nePlain = linkLinePlain(researchByTopic.ne) || '•  – ';
-    var outrosPlain = linkLinePlain(researchByTopic.outros) || '•  – ';
+    var outrosPlain = linkLinePlain(outrosMerged) || '•  – ';
     var avaliadoPlain = reviewsForAvaliado.length ? reviewsForAvaliado.map(function(r) {
         return '• [' + formatDateDDMMAAAA(r.date) + '] Avaliado com: ' + (r.who || '') + (r.reason ? ' – ' + r.reason : '');
     }).join('<br>') : (validadoComVal ? '• [' + formatDateDDMMAAAA(new Date()) + '] Avaliado com: ' + validadoComVal : '');
-    var techHtmlClean = '<strong>DETALHAMENTO TÉCNICO</strong><br><br><strong>Empresa de teste:</strong><br>' + empresaTesteHtml + '<br><br><strong>Testes realizados:</strong><br>' + testsClean + '<br><br><strong>Pesquisas & Referências:</strong><br><strong>SAI\'s liberadas:</strong><br>' + saiPlain + '<br><strong>NE:</strong><br>' + nePlain + '<br><strong>Outros links:</strong><br>' + outrosPlain + '<br><br><strong>Avaliado com:</strong><br>' + avaliadoPlain + '<br><br><strong>Solução final:</strong><br>' + solutionClean;
+    var techHtmlClean = '<strong>DETALHAMENTO TÉCNICO</strong><br><br><strong>Empresa de teste:</strong><br>' + empresaTesteHtml + '<br><br><strong>Testes realizados:</strong><br>' + testsClean + '<br><br><strong>Pesquisas & Referências:</strong><br><strong>SAI\'s liberadas:</strong><br>' + saiPlain + '<br><strong>Outros links:</strong><br>' + outrosPlain + '<br><br><strong>Avaliado com:</strong><br>' + avaliadoPlain + '<br><br><strong>Solução final:</strong><br>' + solutionClean;
     var htmlForTextarea = techHtmlClean;
 
     var sep = '_____________________________________________________________________________________________________________________________________________________';
@@ -1647,11 +1705,9 @@ function copyTechnicalData() {
         }).join('<br>');
     }
     var psaiSaiLinks = psaiLinkFormatLiteralHtml(researchByTopic.saiLiberadas) || '–';
-    var psaiNeLinks = psaiLinkFormatLiteralHtml(researchByTopic.ne) || '–';
-    var psaiOutrosLinks = psaiLinkFormatLiteralHtml(researchByTopic.outros) || '–';
+    var psaiOutrosLinks = psaiLinkFormatLiteralHtml(outrosMerged) || '–';
     var psaiSaiLinksPlain = psaiLinkFormatLiteral(researchByTopic.saiLiberadas);
-    var psaiNeLinksPlain = psaiLinkFormatLiteral(researchByTopic.ne);
-    var psaiOutrosLinksPlain = psaiLinkFormatLiteral(researchByTopic.outros);
+    var psaiOutrosLinksPlain = psaiLinkFormatLiteral(outrosMerged);
 
     var psaiExtraLines = [];
     psaiExtraLines.push('Empresa enviada para eSocial: ' + (c.psaiCompanySentEsocial ? 'Sim' : 'Não'));
@@ -1660,8 +1716,8 @@ function copyTechnicalData() {
     var psaiExtrasHtml = '<br>' + psaiExtraLines.join('<br>');
     var psaiExtrasPlain = '\n' + psaiExtraLines.map(function(l) { return l.replace(/<[^>]*>/g, ''); }).join('\n');
 
-    var psaiTechHtml = sep + '<br><strong>EMPRESA TESTE</strong><br>' + empresaTesteHtml + psaiExtrasHtml + '<br><br>' + sep + '<br><strong>TESTES REALIZADOS</strong><br>' + testsClean + '<br><br>' + sep + '<br><strong>PESQUISAS & REFERÊNCIAS</strong><br><strong>SAI\'s liberadas:</strong><br>' + psaiSaiLinks + '<br><strong>NE:</strong><br>' + psaiNeLinks + '<br><strong>Outros links:</strong><br>' + psaiOutrosLinks + '<br><br>' + sep + '<br><strong>AVALIADO COM</strong><br>' + psaiAvaliadoLinesHtml + '<br><br>' + sep + '<br><strong>SOLUÇÃO FINAL</strong><br>' + solutionClean;
-    var psaiPesquisasPlain = "SAI's liberadas:\n" + (psaiSaiLinksPlain || '–') + "\n\nNE:\n" + (psaiNeLinksPlain || '–') + "\n\nOutros links:\n" + (psaiOutrosLinksPlain || '–');
+    var psaiTechHtml = sep + '<br><strong>EMPRESA TESTE</strong><br>' + empresaTesteHtml + psaiExtrasHtml + '<br><br>' + sep + '<br><strong>TESTES REALIZADOS</strong><br>' + testsClean + '<br><br>' + sep + '<br><strong>PESQUISAS & REFERÊNCIAS</strong><br><strong>SAI\'s liberadas:</strong><br>' + psaiSaiLinks + '<br><strong>Outros links:</strong><br>' + psaiOutrosLinks + '<br><br>' + sep + '<br><strong>AVALIADO COM</strong><br>' + psaiAvaliadoLinesHtml + '<br><br>' + sep + '<br><strong>SOLUÇÃO FINAL</strong><br>' + solutionClean;
+    var psaiPesquisasPlain = "SAI's liberadas:\n" + (psaiSaiLinksPlain || '–') + "\n\nOutros links:\n" + (psaiOutrosLinksPlain || '–');
     var psaiTechPlain = sep + '\nEMPRESA TESTE\n' + empresaTestePlain + psaiExtrasPlain + '\n\n' + sep + '\nTESTES REALIZADOS\n' + testsPlain + '\n\n' + sep + '\nPESQUISAS & REFERÊNCIAS\n' + psaiPesquisasPlain + '\n\n' + sep + '\nAVALIADO COM\n' + psaiAvaliadoLinesPlain + '\n\n' + sep + '\nSOLUÇÃO FINAL\n' + solutionPlain;
 
     var copyListener = function(e) {
@@ -2158,11 +2214,17 @@ function renderDashboard() {
     var avgScore = withScore.length ? (withScore.reduce(function(s, c) { return s + parseFloat(c.saiScore); }, 0) / withScore.length).toFixed(1) : '-';
     var totalScore = withScore.length ? withScore.reduce(function(s, c) { return s + parseFloat(c.saiScore); }, 0) : 0;
     statsEl.innerHTML = '<div class="dashboard-stat"><div class="val">' + inPeriod.length + '</div><div class="lbl">No período</div></div><div class="dashboard-stat"><div class="val">' + concluded.length + '</div><div class="lbl">Concluídos</div></div><div class="dashboard-stat"><div class="val">' + avgScore + '</div><div class="lbl">Pont. média</div></div><div class="dashboard-stat"><div class="val">' + totalScore + '</div><div class="lbl">Pont. total</div></div>';
-    var byType = { PSAI: 0, SS: 0, SAI: 0, NE: 0 };
-    inPeriod.forEach(function(c) { var w = c.workType || 'PSAI'; if (byType[w] !== undefined) byType[w]++; else byType.PSAI++; });
-    var total = byType.PSAI + byType.SS + byType.SAI + byType.NE || 1;
-    var pctP = (byType.PSAI / total * 100).toFixed(1); var pctS = (byType.SS / total * 100).toFixed(1); var pctA = (byType.SAI / total * 100).toFixed(1); var pctN = (byType.NE / total * 100).toFixed(1);
-    var conic = total ? 'conic-gradient(var(--tr-orange) 0% ' + pctP + '%, #3b82f6 ' + pctP + '% ' + (parseFloat(pctP) + parseFloat(pctS)) + '%, #10b981 ' + (parseFloat(pctP) + parseFloat(pctS)) + '% ' + (parseFloat(pctP) + parseFloat(pctS) + parseFloat(pctA)) + '%, #8b5cf6 ' + (parseFloat(pctP) + parseFloat(pctS) + parseFloat(pctA)) + '% 100%)' : 'var(--border-color)';
+    var byType = { PSAI: 0, SS: 0, SAI: 0 };
+    inPeriod.forEach(function(c) {
+        var w = c.workType || 'PSAI';
+        if (w === 'NE') w = 'PSAI';
+        if (byType[w] !== undefined) byType[w]++;
+        else byType.PSAI++;
+    });
+    var total = byType.PSAI + byType.SS + byType.SAI || 1;
+    var pctP = (byType.PSAI / total * 100).toFixed(1); var pctS = (byType.SS / total * 100).toFixed(1); var pctA = (byType.SAI / total * 100).toFixed(1);
+    var p = parseFloat(pctP), s = parseFloat(pctS), a = parseFloat(pctA);
+    var conic = total ? 'conic-gradient(var(--tr-orange) 0% ' + p + '%, #3b82f6 ' + p + '% ' + (p + s) + '%, #10b981 ' + (p + s) + '% 100%)' : 'var(--border-color)';
     var last6 = [];
     var now = new Date();
     for (var i = 5; i >= 0; i--) {
@@ -2198,7 +2260,7 @@ function renderDashboard() {
         return '<div class="chart-bar-wrap"><div class="chart-bars-group"><div class="chart-bar chart-bar-psai" style="height:' + psaiH + '%" title="PSAI: ' + x.psai + '"></div><div class="chart-bar chart-bar-sai" style="height:' + saiH + '%" title="SAI: ' + x.sai + '"></div></div><div class="chart-bar-lbl">' + escapeHtml(x.label) + '</div></div>';
     }).join('');
     var barCardHtml = '<div class="dashboard-chart-card chart-line-card"><h4>Últimos 6 meses</h4><div class="chart-bars chart-bars-dual">' + barsHtml + '</div><div class="chart-line-legend"><span><span class="dot" style="background:var(--tr-orange)"></span>PSAI analisadas</span><span><span class="dot" style="background:#10b981"></span>SAIs geradas</span></div></div>';
-    if (chartsEl) chartsEl.innerHTML = '<div class="dashboard-chart-card"><h4>Volume por tipo</h4><div class="chart-donut" style="background:' + conic + '"></div><div class="chart-legend"><span><span class="dot" style="background:var(--tr-orange)"></span>PSAI ' + byType.PSAI + '</span><span><span class="dot" style="background:#3b82f6"></span>SS ' + byType.SS + '</span><span><span class="dot" style="background:#10b981"></span>SAI ' + byType.SAI + '</span><span><span class="dot" style="background:#8b5cf6"></span>NE ' + byType.NE + '</span></div></div>' + barCardHtml;
+    if (chartsEl) chartsEl.innerHTML = '<div class="dashboard-chart-card"><h4>Volume por tipo</h4><div class="chart-donut" style="background:' + conic + '"></div><div class="chart-legend"><span><span class="dot" style="background:var(--tr-orange)"></span>PSAI ' + byType.PSAI + '</span><span><span class="dot" style="background:#3b82f6"></span>SS ' + byType.SS + '</span><span><span class="dot" style="background:#10b981"></span>SAI ' + byType.SAI + '</span></div></div>' + barCardHtml;
     inPeriod.sort(function(a, b) { return caseRefTime(b) - caseRefTime(a); });
     listEl.innerHTML = '';
     function formatSaiDateForDisplay(isoOrYmd) {
@@ -2219,6 +2281,7 @@ function renderDashboard() {
         var scoreHtml = '<span class="d-score">' + (typeof score === 'number' ? score : escapeHtml(String(score))) + '</span>';
         if (scoreDate) scoreHtml += ' <span class="d-score-date">(' + escapeHtml(scoreDate) + ')</span>';
         var wt = (c.workType || 'PSAI');
+        if (wt === 'NE') wt = 'PSAI';
         item.innerHTML = '<span class="d-title">' + (c.title || 'Sem título').replace(/</g, '&lt;') + '</span><span class="d-meta">' + meta.replace(/</g, '&lt;') + '</span><span class="d-level">' + wt + ' · ' + level + '</span>' + scoreHtml;
         item.addEventListener('click', function() { loadCase(c.id); toggleModal('modal-dashboard', false); var g = getEl('btn-tab-general'); if (g) g.click(); });
         listEl.appendChild(item);
@@ -2478,7 +2541,7 @@ document.addEventListener('DOMContentLoaded', function() {
             var html = getVal('ss-html-paste') || '';
             if (!html.trim()) { alert('Cole o HTML da SS ou envie um arquivo.'); return; }
             var data = parseSSHtml(html);
-            applyParsedSS(data);
+            applyParsedSS(data, { force: true });
             toggleModal('modal-ler-ss', false);
         },
         'btn-ler-ss-aba': function() {
@@ -2506,14 +2569,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     alert('Nenhuma aba aberta com a SS ' + ssNumero + '.\nAbra a página da SS ' + ssNumero + ' no navegador (sgd.dominiosistemas.com.br/sgsa/faces/ss.html?ss=' + ssNumero + ') e tente novamente.');
                     return;
                 }
-                chrome.tabs.sendMessage(tab.id, { action: 'SCRAPE_SS' }, function(response) {
+                chrome.runtime.sendMessage({ action: 'DP_SCRAPE_SS_TAB', ssNumero: ssNumero }, function(response) {
                     if (chrome.runtime.lastError) {
                         alert('Não foi possível ler a aba. Recarregue a página da SS (F5) e tente de novo.');
                         return;
                     }
                     if (response && response.html) {
                         var data = parseSSHtml(response.html);
-                        applyParsedSS(data);
+                        applyParsedSS(data, { force: true });
                         var badge = getEl('ss-tramites-badge');
                         if (badge) badge.textContent = (data.tramitesCount || 0) + ((data.tramitesCount || 0) === 1 ? ' Trâmite' : ' Trâmites');
                     } else if (response && response.error) {

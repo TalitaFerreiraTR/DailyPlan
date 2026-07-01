@@ -1,3 +1,56 @@
+function scoreSsHtml(html) {
+    if (!html || typeof html !== 'string') return -1;
+    var s = 0;
+    if (html.indexOf('tableVisualizacaoField') !== -1) s += 20;
+    if (html.indexOf('tableVisualizacaoDestaque') !== -1) s += 20;
+    if (html.indexOf('tableVisualizacaoHtml') !== -1) s += 20;
+    if (/Número:\s*\d+/.test(html)) s += 10;
+    if (html.indexOf('Assunto:') !== -1) s += 8;
+    if (html.indexOf('Descreva de forma detalhada') !== -1) s += 8;
+    if (html.indexOf('Passos para reproduzir') !== -1) s += 8;
+    if (/tramite\d+/i.test(html) || html.indexOf('TRÂMITES') !== -1) s += 5;
+    return s;
+}
+
+function pickBestHtmlFromFrameResults(results) {
+    if (!results || !results.length) return '';
+    var best = '';
+    var bestScore = -1;
+    for (var i = 0; i < results.length; i++) {
+        var inj = results[i];
+        if (inj.error) continue;
+        var r = inj.result;
+        if (!r || typeof r.html !== 'string') continue;
+        var h = r.html;
+        if (!h.length) continue;
+        var sc = scoreSsHtml(h);
+        if (sc > bestScore || (sc === bestScore && h.length > best.length)) {
+            bestScore = sc;
+            best = h;
+        }
+    }
+    return best;
+}
+
+function scrapeSsHtmlAllFrames(tabId, callback) {
+    chrome.scripting.executeScript({
+        target: { tabId: tabId, allFrames: true },
+        func: function() {
+            try {
+                return { html: document.documentElement ? document.documentElement.outerHTML : '' };
+            } catch (e) {
+                return { html: '' };
+            }
+        }
+    }, function(results) {
+        if (chrome.runtime.lastError) {
+            callback('', chrome.runtime.lastError.message);
+            return;
+        }
+        callback(pickBestHtmlFromFrameResults(results), null);
+    });
+}
+
 chrome.action.onClicked.addListener(function() {
     chrome.tabs.query({ url: 'https://talitaferreiratr.github.io/DailyPlan/*' }, function(tabs) {
         if (tabs.length > 0) {
@@ -42,9 +95,59 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     if (msg.action === 'DP_SCRAPE_SS_TAB') {
         findSSTab(msg.ssNumero || '', function(tab) {
             if (!tab) { sendResponse({ error: 'Nenhuma aba com SS encontrada. Abra a SS no navegador e tente novamente.' }); return; }
-            chrome.tabs.sendMessage(tab.id, { action: 'SCRAPE_SS' }, function(response) {
-                if (chrome.runtime.lastError) { sendResponse({ error: 'Não foi possível ler a aba. Recarregue a página da SS (F5) e tente de novo.' }); return; }
-                sendResponse(response && response.html ? { html: response.html } : { error: 'Resposta inválida da aba. Recarregue a página da SS e tente novamente.' });
+            scrapeSsHtmlAllFrames(tab.id, function(fromFrames, err) {
+                var okFrames = fromFrames && scoreSsHtml(fromFrames) >= 10;
+                if (okFrames) {
+                    sendResponse({ html: fromFrames });
+                    return;
+                }
+                chrome.tabs.sendMessage(tab.id, { action: 'SCRAPE_SS' }, function(response) {
+                    if (chrome.runtime.lastError) {
+                        if (fromFrames && fromFrames.length > 100) {
+                            sendResponse({ html: fromFrames });
+                            return;
+                        }
+                        sendResponse({ error: 'Não foi possível ler a aba. Recarregue a página da SS (F5) e tente de novo.' });
+                        return;
+                    }
+                    var hMsg = response && response.html;
+                    if (hMsg && scoreSsHtml(hMsg) >= (fromFrames ? scoreSsHtml(fromFrames) : 0)) {
+                        sendResponse({ html: hMsg });
+                    } else if (fromFrames && fromFrames.length > 100) {
+                        sendResponse({ html: fromFrames });
+                    } else if (hMsg) {
+                        sendResponse({ html: hMsg });
+                    } else {
+                        sendResponse({ error: (response && response.error) ? response.error : 'Resposta inválida da aba. Recarregue a página da SS e tente novamente.' });
+                    }
+                });
+            });
+        });
+        return true;
+    }
+
+    if (msg.action === 'DP_CAPTURE_SS_HTML') {
+        var capTabId = sender.tab && sender.tab.id;
+        if (!capTabId) {
+            sendResponse({ error: 'Aba não identificada. Recarregue a página da SS.' });
+            return true;
+        }
+        scrapeSsHtmlAllFrames(capTabId, function(fromFrames, err) {
+            if (fromFrames && scoreSsHtml(fromFrames) >= 10) {
+                sendResponse({ html: fromFrames });
+                return;
+            }
+            chrome.tabs.sendMessage(capTabId, { action: 'SCRAPE_SS' }, function(response) {
+                var hMsg = response && response.html;
+                if (hMsg && scoreSsHtml(hMsg) >= (fromFrames ? scoreSsHtml(fromFrames) : 0)) {
+                    sendResponse({ html: hMsg });
+                } else if (fromFrames && fromFrames.length > 100) {
+                    sendResponse({ html: fromFrames });
+                } else if (hMsg) {
+                    sendResponse({ html: hMsg });
+                } else {
+                    sendResponse({ error: err || 'Não foi possível obter o HTML da SS.' });
+                }
             });
         });
         return true;

@@ -357,7 +357,6 @@
                 <button type="button" class="filter-chip" data-filter="PSAI">PSAI</button>
                 <button type="button" class="filter-chip" data-filter="SS">SS</button>
                 <button type="button" class="filter-chip" data-filter="SAI">SAI</button>
-                <button type="button" class="filter-chip" data-filter="NE">NE</button>
             </div>
         <div id="sidebar-groups" class="sidebar-groups" style="padding:8px 10px; border-bottom:1px solid var(--border-color);">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
@@ -390,7 +389,6 @@
                     <button type="button" class="work-type-btn" data-type="PSAI"><span class="wt-icon"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:24px;height:24px;"><path d="M4 17l6-6-6-6"/><path d="M12 19h8"/></svg></span><span>PSAI</span></button>
                     <button type="button" class="work-type-btn" data-type="SS"><span class="wt-icon"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:24px;height:24px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></span><span>SS</span></button>
                     <button type="button" class="work-type-btn" data-type="SAI"><span class="wt-icon"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:24px;height:24px;"><path d="M12 2v6l4 2 4 8H4l4-8 4-2V2z"/></svg></span><span>SAI</span></button>
-                    <button type="button" class="work-type-btn" data-type="NE"><span class="wt-icon"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:24px;height:24px;"><path d="M4 6h16M4 12h16M4 18h16"/></svg></span><span>NE</span></button>
                 </div>
                 <p class="empty-state-hint">Ou selecione uma análise na lista ao lado.</p>
             </div>
@@ -434,7 +432,7 @@
                         </div>
                         <div class="card-body-toggle">
                         <label>Tipo de trabalho</label>
-                        <select id="input-work-type"><option value="PSAI">PSAI</option><option value="SS">SS</option><option value="SAI">SAI</option><option value="NE">NE</option></select>
+                        <select id="input-work-type"><option value="PSAI">PSAI</option><option value="SS">SS</option><option value="SAI">SAI</option></select>
                         </div>
                     </div>
                     <!-- PsaiPainel: linha de cabeçalho Cód. PSAI | Nível | Data (ref. imagem) -->
@@ -605,26 +603,6 @@
                         </div>
                     </div>
                     </div>
-                    <!-- NEPanel: mínimo (Título, Tipo, Status NE) -->
-                    <div id="ne-painel" class="panel-general">
-                    <div class="card card-collapsible section-psai">
-                        <div class="card-header-toggle" title="Clique para minimizar/expandir">
-                            <h3><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;vertical-align:-2px;"><path d="M4 6h16M4 12h16M4 18h16"/></svg>NE</h3>
-                            <button type="button" class="header-btn card-toggle-btn" aria-label="Minimizar/Expandir"><svg viewBox="0 0 24 24" class="icon-outline" style="width:16px;height:16px;"><path d="M6 9l6 6 6-6"/></svg></button>
-                        </div>
-                        <div class="card-body-toggle">
-                        <div style="display:grid; grid-template-columns: 2fr 1fr; gap: 15px;">
-                            <div><label>Título</label><input type="text" id="input-ne-title" placeholder="Título"></div>
-                            <div><label>Tipo</label><input type="text" id="input-ne-type" placeholder="Ex: Melhoria"></div>
-                        </div>
-                        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top:10px;">
-                            <div><label>Status</label><select id="input-ne-status"><option value="">—</option><option value="Aguardando reunião">Aguardando reunião</option><option value="Em análise interna">Em análise interna</option><option value="Reprovada">Reprovada</option><option value="Concluído">Concluído</option></select></div>
-                            <div><label>Prioridade</label><select id="input-ne-priority"><option value="null">-</option><option value="Alta">Alta</option><option value="Media">Média</option><option value="Baixa">Baixa</option></select></div>
-                            <div><label>Prazo</label><input type="date" id="input-ne-deadline"></div>
-                        </div>
-                        </div>
-                    </div>
-                    </div>
                     <div class="footer-actions"><button type="button" class="btn-secondary btn-action" id="btn-export-single-gen">Exportar Este</button><div style="flex:1"></div><button type="button" class="btn-danger btn-action" id="btn-delete-gen" title="Excluir análise"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:16px;height:16px;"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button><button type="button" class="btn-primary btn-action" id="btn-save-gen">Salvar Agora</button></div>
                 </div>
 
@@ -723,7 +701,6 @@
                         <div class="card-body-toggle">
                         <div id="research-wrapper">
                             <div class="research-topic"><div class="research-topic-title">SAI's liberadas <button type="button" class="header-btn btn-add-research-topic" data-topic="sai" style="width:24px; height:24px;"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:12px;height:12px;"><path d="M12 5v14M5 12h14"/></svg></button></div><div id="research-container-sai" class="research-container"></div></div>
-                            <div class="research-topic"><div class="research-topic-title">NE <button class="header-btn btn-add-research-topic" data-topic="ne" style="width:24px; height:24px;"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:12px;height:12px;"><path d="M12 5v14M5 12h14"/></svg></button></div><div id="research-container-ne" class="research-container"></div></div>
                             <div class="research-topic"><div class="research-topic-title">Outros links <button class="header-btn btn-add-research-topic" data-topic="outros" style="width:24px; height:24px;"><svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:12px;height:12px;"><path d="M12 5v14M5 12h14"/></svg></button></div><div id="research-container-outros" class="research-container"></div></div>
                         </div>
                         </div></div>
@@ -825,6 +802,6 @@
             </div>
         </div>
     </div>
-    <script src="logic.js"></script>
+    <script src="logic.js?v=8.6"></script>
 </body>
 </html>

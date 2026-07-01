@@ -47,8 +47,8 @@
             if (m) ssNumber = m[1];
         }
         var title = ssNumber ? 'SS ' + ssNumber : 'Nova Análise';
-        var fullHtml = document.documentElement.outerHTML;
 
+        function doSaveWithHtml(fullHtml) {
         chrome.storage.local.get(['myCasesV14'], function(result) {
             var cases = result.myCasesV14 ? JSON.parse(result.myCasesV14) : [];
             var newId = Date.now();
@@ -98,6 +98,25 @@
                 if (!btn.matches(':hover')) btn.onmouseleave();
             });
         });
+        }
+
+        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+            chrome.runtime.sendMessage({ action: 'DP_CAPTURE_SS_HTML' }, function(response) {
+                var fallback = (typeof window.__dailyPlanGetSSHtml === 'function')
+                    ? window.__dailyPlanGetSSHtml()
+                    : document.documentElement.outerHTML;
+                if (chrome.runtime.lastError) {
+                    doSaveWithHtml(fallback);
+                    return;
+                }
+                var fullHtml = (response && response.html) ? response.html : fallback;
+                doSaveWithHtml(fullHtml);
+            });
+        } else {
+            doSaveWithHtml((typeof window.__dailyPlanGetSSHtml === 'function')
+                ? window.__dailyPlanGetSSHtml()
+                : document.documentElement.outerHTML);
+        }
     };
     document.body.appendChild(btn);
 })();

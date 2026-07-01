@@ -8,6 +8,46 @@
 (function() {
     if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.onMessage) return;
 
+    /**
+     * O SGD pode renderizar a SS dentro de um iframe (mesma origem). O outerHTML do documento
+     * principal não inclui o DOM interno do iframe, e o parser da extensão não encontra tabelas.
+     */
+    function getDailyPlanSSPageHtml() {
+        function hasSsMarkers(html) {
+            if (!html || typeof html !== 'string') return false;
+            return html.indexOf('tableVisualizacaoField') !== -1
+                || html.indexOf('tableVisualizacaoDestaque') !== -1
+                || /Número:\s*\d+/.test(html);
+        }
+        function htmlFromDoc(doc) {
+            try {
+                return doc && doc.documentElement ? doc.documentElement.outerHTML : '';
+            } catch (e) {
+                return '';
+            }
+        }
+        function walkIframes(doc, depth, maxDepth) {
+            if (!doc || depth > maxDepth) return '';
+            var h = htmlFromDoc(doc);
+            if (hasSsMarkers(h)) return h;
+            var iframes = doc.querySelectorAll('iframe');
+            for (var i = 0; i < iframes.length; i++) {
+                try {
+                    var iframeDoc = iframes[i].contentDocument || (iframes[i].contentWindow && iframes[i].contentWindow.document);
+                    if (!iframeDoc) continue;
+                    var inner = walkIframes(iframeDoc, depth + 1, maxDepth);
+                    if (inner) return inner;
+                } catch (err) {}
+            }
+            return '';
+        }
+        var main = htmlFromDoc(document);
+        if (hasSsMarkers(main)) return main;
+        var fromFrame = walkIframes(document, 0, 5);
+        return fromFrame || main;
+    }
+    try { window.__dailyPlanGetSSHtml = getDailyPlanSSPageHtml; } catch (e) {}
+
     function discoverFormFields() {
         var results = { textareas: [], inputs: [], iframes: [], buttons: [], forms: [] };
         document.querySelectorAll('textarea').forEach(function(el) {
@@ -113,7 +153,7 @@
 
         if (msg.action === 'SCRAPE_SS') {
             try {
-                sendResponse({ html: document.documentElement.outerHTML });
+                sendResponse({ html: getDailyPlanSSPageHtml() });
             } catch (e) {
                 sendResponse({ error: (e && e.message) || 'Erro ao ler página' });
             }
