@@ -2817,18 +2817,35 @@ function copyTechnicalData() {
     var empresaTesteHtml = dominioPartsHtml.length ? dominioPartsHtml.join('<br>') : escapeHtml(c.companyTest || '');
     var empresaTestePlain = dominioPartsPlain.length ? dominioPartsPlain.join('\n') : (c.companyTest || '');
 
+    function hasRefs(list) { return (list || []).some(function(r) { return (r.desc || '').trim() || (r.link || '').trim(); }); }
+    var hasEmpresa = !!((empresaTestePlain || '').trim());
+    var hasTests = !!((testsPlain || '').trim());
+    var hasSai = hasRefs(researchByTopic.saiLiberadas);
+    var hasOutros = hasRefs(outrosMerged);
+    var hasPesquisas = hasSai || hasOutros;
+    var hasAvaliado = (reviewsForAvaliado && reviewsForAvaliado.length > 0) || !!validadoComVal;
+    var hasSolution = !!((solutionPlain || '').trim());
+
     var techHtml = `<div style="margin-bottom:16px;"><span style="color:#fa6400"><strong>DETALHAMENTO TÉCNICO</strong></span><br>
   <strong>Empresa de teste:</strong><br>${empresaTesteHtml}<br><br>
   <strong>Testes realizados:</strong><br>${formData.testesRealizados}<br><br>
   <strong>Pesquisas &amp; Referências:</strong><br><strong>SAI's liberadas:</strong><br>${saiHtml}<br><strong>Outros links:</strong><br>${outrosHtml}<br><br>
   <strong>Avaliado com:</strong><br>${avaliadoHtml}<br><br><strong>Solução final:</strong><br>${formData.solucaoFinal}</div>`;
 
-    var plainPesquisas = "SAI's liberadas:\n" + formatRefList(researchByTopic.saiLiberadas, 'plain') +
-        "\nOutros links:\n" + formatRefList(outrosMerged, 'plain');
+    var plainPesquisasParts = [];
+    if (hasSai) plainPesquisasParts.push("SAI's liberadas:\n" + formatRefList(researchByTopic.saiLiberadas, 'plain'));
+    if (hasOutros) plainPesquisasParts.push("Outros links:\n" + formatRefList(outrosMerged, 'plain'));
+    var plainPesquisas = plainPesquisasParts.join('\n');
     var plainAvaliado = reviewsForAvaliado.length ? reviewsForAvaliado.map(function(r) {
         return '• [' + formatDateDDMMAAAA(r.date) + '] Avaliado com: ' + (r.who || '') + (r.reason ? ' – ' + r.reason : '');
     }).join('\n') : (validadoComVal ? '• [' + formatDateDDMMAAAA(new Date()) + '] Avaliado com: ' + validadoComVal : '');
-    var techPlain = `EMPRESA DE TESTE:\n${empresaTestePlain}\n\nTESTES REALIZADOS:\n${testsPlain}\n\nPESQUISAS & REFERÊNCIAS:\n${plainPesquisas}\n\nAVALIADO COM:\n${plainAvaliado}\n\nSOLUÇÃO FINAL:\n${solutionPlain}`;
+    var techPlainSections = [];
+    if (hasEmpresa) techPlainSections.push('EMPRESA DE TESTE:\n' + empresaTestePlain);
+    if (hasTests) techPlainSections.push('TESTES REALIZADOS:\n' + testsPlain);
+    if (hasPesquisas) techPlainSections.push('PESQUISAS & REFERÊNCIAS:\n' + plainPesquisas);
+    if (hasAvaliado) techPlainSections.push('AVALIADO COM:\n' + plainAvaliado);
+    if (hasSolution) techPlainSections.push('SOLUÇÃO FINAL:\n' + solutionPlain);
+    var techPlain = techPlainSections.join('\n\n');
 
     var htmlContent = '<div style="font-family: Arial, sans-serif; font-size: 11pt; color: #000000;">' + visaoHtml + contextoHtml + techHtml + '</div>';
     var plainText = '========== VISÃO GERAL ==========\n' + visaoPlain + '\n\n========== CONTEXTO & RESUMO ==========\n' + contextoPlain + '\n\n========== DETALHAMENTO TÉCNICO ==========\n' + techPlain;
@@ -2872,9 +2889,29 @@ function copyTechnicalData() {
     var psaiExtrasHtml = '<br>' + psaiExtraLines.join('<br>');
     var psaiExtrasPlain = '\n' + psaiExtraLines.map(function(l) { return l.replace(/<[^>]*>/g, ''); }).join('\n');
 
-    var psaiTechHtml = sep + '<br><strong>EMPRESA TESTE</strong><br>' + empresaTesteHtml + psaiExtrasHtml + '<br><br>' + sep + '<br><strong>TESTES REALIZADOS</strong><br>' + testsClean + '<br><br>' + sep + '<br><strong>PESQUISAS & REFERÊNCIAS</strong><br><strong>SAI\'s liberadas:</strong><br>' + psaiSaiLinks + '<br><strong>Outros links:</strong><br>' + psaiOutrosLinks + '<br><br>' + sep + '<br><strong>AVALIADO COM</strong><br>' + psaiAvaliadoLinesHtml + '<br><br>' + sep + '<br><strong>SOLUÇÃO FINAL</strong><br>' + solutionClean;
-    var psaiPesquisasPlain = "SAI's liberadas:\n" + (psaiSaiLinksPlain || '–') + "\n\nOutros links:\n" + (psaiOutrosLinksPlain || '–');
-    var psaiTechPlain = sep + '\nEMPRESA TESTE\n' + empresaTestePlain + psaiExtrasPlain + '\n\n' + sep + '\nTESTES REALIZADOS\n' + testsPlain + '\n\n' + sep + '\nPESQUISAS & REFERÊNCIAS\n' + psaiPesquisasPlain + '\n\n' + sep + '\nAVALIADO COM\n' + psaiAvaliadoLinesPlain + '\n\n' + sep + '\nSOLUÇÃO FINAL\n' + solutionPlain;
+    var psaiHtmlSections = [];
+    if (hasEmpresa) psaiHtmlSections.push('<strong>EMPRESA TESTE</strong><br>' + empresaTesteHtml + psaiExtrasHtml);
+    if (hasTests) psaiHtmlSections.push('<strong>TESTES REALIZADOS</strong><br>' + testsClean);
+    if (hasPesquisas) {
+        var pesqHtml = '<strong>PESQUISAS & REFERÊNCIAS</strong><br>';
+        if (hasSai) pesqHtml += '<strong>SAI\'s liberadas:</strong><br>' + psaiSaiLinks + (hasOutros ? '<br>' : '');
+        if (hasOutros) pesqHtml += '<strong>Outros links:</strong><br>' + psaiOutrosLinks;
+        psaiHtmlSections.push(pesqHtml);
+    }
+    if (hasAvaliado) psaiHtmlSections.push('<strong>AVALIADO COM</strong><br>' + psaiAvaliadoLinesHtml);
+    if (hasSolution) psaiHtmlSections.push('<strong>SOLUÇÃO FINAL</strong><br>' + solutionClean);
+    var psaiTechHtml = psaiHtmlSections.map(function(s) { return sep + '<br>' + s; }).join('<br><br>');
+    var psaiPesquisasParts = [];
+    if (hasSai) psaiPesquisasParts.push("SAI's liberadas:\n" + psaiSaiLinksPlain);
+    if (hasOutros) psaiPesquisasParts.push("Outros links:\n" + psaiOutrosLinksPlain);
+    var psaiPesquisasPlain = psaiPesquisasParts.join('\n\n');
+    var psaiPlainSections = [];
+    if (hasEmpresa) psaiPlainSections.push('EMPRESA TESTE\n' + empresaTestePlain + psaiExtrasPlain);
+    if (hasTests) psaiPlainSections.push('TESTES REALIZADOS\n' + testsPlain);
+    if (hasPesquisas) psaiPlainSections.push('PESQUISAS & REFERÊNCIAS\n' + psaiPesquisasPlain);
+    if (hasAvaliado) psaiPlainSections.push('AVALIADO COM\n' + psaiAvaliadoLinesPlain);
+    if (hasSolution) psaiPlainSections.push('SOLUÇÃO FINAL\n' + solutionPlain);
+    var psaiTechPlain = psaiPlainSections.map(function(s) { return sep + '\n' + s; }).join('\n\n');
 
     var copyListener = function(e) {
         e.preventDefault();
