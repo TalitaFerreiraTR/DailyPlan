@@ -1543,6 +1543,53 @@ function copyTechnicalData() {
         return (list || []).map(function(r) { return linkLine(r.link, r.desc, useBoldDash); }).join('<br>');
     }
 
+    function refLabel(url) {
+        var u = (url || '').trim();
+        if (!u) return '';
+        var mParam = u.match(/[?&](psai|sam|sai|ss|ne|sa)=(\d+)/i);
+        if (mParam) return mParam[1].toUpperCase() + ' ' + mParam[2];
+        var mText = u.match(/\b(psai|sam|sai|ss|ne|sa)\s*[:#=\/-]?\s*(\d{3,})\b/i);
+        if (mText) return mText[1].toUpperCase() + ' ' + mText[2];
+        return '';
+    }
+    function formatRefList(list, mode) {
+        list = list || [];
+        var groups = [];
+        var byDesc = {};
+        list.forEach(function(r) {
+            var desc = (r.desc || '').trim();
+            var link = (r.link || '').trim();
+            if (!desc && !link) return;
+            var g;
+            if (desc && Object.prototype.hasOwnProperty.call(byDesc, desc)) {
+                g = byDesc[desc];
+            } else {
+                g = { desc: desc, links: [] };
+                groups.push(g);
+                if (desc) byDesc[desc] = g;
+            }
+            if (link) g.links.push(link);
+        });
+        if (!groups.length) return '–';
+        var joiner = mode === 'psaiHtml' ? '<br>' : '\n';
+        return groups.map(function(g) {
+            var anchors = g.links.map(function(link) {
+                var label = refLabel(link);
+                var linkQ = link.replace(/"/g, '&quot;');
+                if (mode === 'psaiHtml') {
+                    return '&lt;A HREF = "' + linkQ + '" target="_blank"&gt;&lt;b&gt;' + escapeHtml(label || link) + '&lt;/b&gt;&lt;/a&gt;';
+                } else if (mode === 'psaiPlain') {
+                    return '<A HREF = "' + linkQ + '" target="_blank"><b>' + (label || link) + '</b></a>';
+                }
+                return label ? (label + ' <' + link + '>') : link;
+            });
+            var parts = [];
+            if (g.desc) parts.push(mode === 'psaiHtml' ? escapeHtml(g.desc) : g.desc);
+            if (anchors.length) parts.push(anchors.join(' · '));
+            return '• ' + parts.join(' ');
+        }).join(joiner);
+    }
+
     var researchByTopic = c.researchByTopic || { saiLiberadas: [], ne: [], outros: [] };
     var outrosMerged = (researchByTopic.outros || []).slice();
     if ((researchByTopic.ne || []).length) outrosMerged = (researchByTopic.ne || []).concat(outrosMerged);
@@ -1590,8 +1637,8 @@ function copyTechnicalData() {
   <strong>Pesquisas &amp; Referências:</strong><br><strong>SAI's liberadas:</strong><br>${saiHtml}<br><strong>Outros links:</strong><br>${outrosHtml}<br><br>
   <strong>Avaliado com:</strong><br>${avaliadoHtml}<br><br><strong>Solução final:</strong><br>${formData.solucaoFinal}</div>`;
 
-    var plainPesquisas = "SAI's liberadas:\n" + (researchByTopic.saiLiberadas || []).map(function(r) { return '• ' + (r.link || '') + (r.desc ? ' – ' + r.desc : ''); }).join('\n') +
-        "\nOutros links:\n" + outrosMerged.map(function(r) { return '• ' + (r.link || '') + (r.desc ? ' – ' + r.desc : ''); }).join('\n');
+    var plainPesquisas = "SAI's liberadas:\n" + formatRefList(researchByTopic.saiLiberadas, 'plain') +
+        "\nOutros links:\n" + formatRefList(outrosMerged, 'plain');
     var plainAvaliado = reviewsForAvaliado.length ? reviewsForAvaliado.map(function(r) {
         return '• [' + formatDateDDMMAAAA(r.date) + '] Avaliado com: ' + (r.who || '') + (r.reason ? ' – ' + r.reason : '');
     }).join('\n') : (validadoComVal ? '• [' + formatDateDDMMAAAA(new Date()) + '] Avaliado com: ' + validadoComVal : '');
@@ -1627,24 +1674,10 @@ function copyTechnicalData() {
         return '• <strong>[' + d + '] ' + who + '</strong>' + (reason ? ' – ' + reason : '');
     }).join('\n') : (validadoComVal ? '• <strong>[' + formatDateDDMMAAAA(new Date()) + '] ' + validadoComVal + '</strong>' : '');
 
-    function psaiLinkFormatLiteral(list) {
-        return (list || []).map(function(r) {
-            var link = (r.link || '').trim().replace(/"/g, '&quot;');
-            var titulo = (r.desc || r.link || '').trim();
-            return '<A HREF = "' + link + '" target="_blank"><b> ' + titulo + ' </b></a>';
-        }).join('\n');
-    }
-    function psaiLinkFormatLiteralHtml(list) {
-        return (list || []).map(function(r) {
-            var link = (r.link || '').trim().replace(/"/g, '&quot;');
-            var titulo = escapeHtml((r.desc || r.link || '').trim());
-            return '&lt;A HREF = "' + link + '" target="_blank"&gt;&lt;b&gt; ' + titulo + ' &lt;/b&gt;&lt;/a&gt;';
-        }).join('<br>');
-    }
-    var psaiSaiLinks = psaiLinkFormatLiteralHtml(researchByTopic.saiLiberadas) || '–';
-    var psaiOutrosLinks = psaiLinkFormatLiteralHtml(outrosMerged) || '–';
-    var psaiSaiLinksPlain = psaiLinkFormatLiteral(researchByTopic.saiLiberadas);
-    var psaiOutrosLinksPlain = psaiLinkFormatLiteral(outrosMerged);
+    var psaiSaiLinks = formatRefList(researchByTopic.saiLiberadas, 'psaiHtml');
+    var psaiOutrosLinks = formatRefList(outrosMerged, 'psaiHtml');
+    var psaiSaiLinksPlain = formatRefList(researchByTopic.saiLiberadas, 'psaiPlain');
+    var psaiOutrosLinksPlain = formatRefList(outrosMerged, 'psaiPlain');
 
     var psaiExtraLines = [];
     psaiExtraLines.push('Empresa enviada para eSocial: ' + (c.psaiCompanySentEsocial ? 'Sim' : 'Não'));
