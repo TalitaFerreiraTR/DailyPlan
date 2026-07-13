@@ -3699,15 +3699,15 @@ document.addEventListener('DOMContentLoaded', function() {
         else { try { localStorage.removeItem('backupFolderName'); } catch (e) {} updateBackupFolderLabel(''); }
     }).catch(function() { updateBackupFolderLabel(''); });
 
-        checkNewVersion().then(function(r) {
-            var banner = getEl('new-version-banner');
-            var numEl = getEl('new-version-number');
-            if (!banner || !r.hasNew) return;
-            try { if (sessionStorage.getItem('dailyplan-dismissed-version') === (r.newVersion || '')) return; } catch (e) {}
-            if (numEl) numEl.textContent = '(v' + r.newVersion + ') ';
-            banner.setAttribute('data-new-version', r.newVersion || '');
-            banner.style.display = 'block';
-        });
+        // Lembrete de atualização da extensão: aparece sempre que a página é aberta/atualizada.
+        var _vbanner = getEl('new-version-banner');
+        if (_vbanner) {
+            _vbanner.style.display = 'block';
+            checkNewVersion().then(function(r) {
+                var numEl = getEl('new-version-number');
+                if (r && r.hasNew && numEl) numEl.textContent = '(v' + r.newVersion + ') ';
+            }).catch(function() {});
+        }
     
     // BOTÃO SAI
     var btnOpenSai = getEl('btn-open-sai');
@@ -3824,8 +3824,6 @@ document.addEventListener('DOMContentLoaded', function() {
         'btn-add-to-group': addCasesToGroupFromModal,
         'btn-close-new-version': function() {
             var banner = getEl('new-version-banner');
-            var ver = banner ? banner.getAttribute('data-new-version') || '' : '';
-            try { if (ver) sessionStorage.setItem('dailyplan-dismissed-version', ver); } catch (e) {}
             if (banner) banner.style.display = 'none';
         },
         'btn-ver-instrucoes': function() {

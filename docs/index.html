@@ -437,7 +437,7 @@
         <div id="avisos-banner" style="display:none; padding:8px 12px; background:rgba(59,130,246,0.12); border-bottom:1px solid var(--active-blue); font-size:11px; color:var(--active-blue); cursor:pointer;" onclick="this.style.display='none';"></div>
         <div id="minha-meta-bar" style="display:none; padding:8px 12px; background:rgba(16,185,129,0.1); border-bottom:1px solid var(--success); font-size:11px; color:var(--success);"><strong>Minha meta:</strong> <span id="minha-meta-text"></span></div>
         <div id="new-version-banner" class="new-version-banner" style="display:none;">
-            <div class="new-version-text"><strong>Nova versão disponível!</strong> <span id="new-version-number"></span> Atualize a extensão.</div>
+            <div class="new-version-text"><strong>Mantenha a extensão DailyPlan atualizada</strong> <span id="new-version-number"></span>— se ela estiver desatualizada, a leitura e o envio ao SGD podem falhar. Veja o passo a passo para atualizar:</div>
             <div class="new-version-actions">
                 <button type="button" class="footer-link" id="btn-ver-instrucoes" style="margin-right:6px;">Ver instruções</button>
                 <button type="button" class="header-btn" id="btn-close-new-version" title="Fechar aviso" style="font-size:16px; line-height:1;">×</button>
@@ -1023,6 +1023,6 @@
     // Mantém a sessão entre reloads (F5) — só sai ao clicar em sair.
     try { firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch (e) { console.warn('Auth persistence:', e); }
     </script>
-    <script src="logic.js?v=7.1.0"></script>
+    <script src="logic.js?v=7.1.1"></script>
 </body>
 </html>
