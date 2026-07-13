@@ -13,7 +13,7 @@ var adminViewMode = false;
 var adminViewUserEmail = '';
 var adminViewUserName = '';
 
-var APP_VERSION = '6.0';
+var APP_VERSION = '7.1.0';
 var firebaseUid = null;
 var _firestoreSaveTimer = null;
 var _firestorePendingData = {};
@@ -263,11 +263,20 @@ function showUserBar() {
 }
 
 function _onAuthReady(fbUser, callback) {
+    document.body.classList.remove('auth-checking');
     if (!fbUser) {
+        currentUser = null;
+        firebaseUid = null;
         document.body.classList.add('auth-required');
         return;
     }
+    // Sessão válida: libera a interface imediatamente, sem esperar o Firestore
+    // (evita a tela de login reaparecer ao dar F5 enquanto perfil/dados carregam).
+    document.body.classList.remove('auth-required');
     firebaseUid = fbUser.uid;
+    if (!currentUser) {
+        currentUser = { username: fbUser.displayName || fbUser.email || 'usuario', role: 'normal', photoURL: fbUser.photoURL || '', uid: fbUser.uid };
+    }
     var userRef = db.collection('users').doc(fbUser.uid);
     var _firestoreName = '';
     userRef.get().then(function(doc) {
@@ -1087,6 +1096,7 @@ function showToast(msg) {
     requestAnimationFrame(function() { toast.style.opacity = '1'; });
     setTimeout(function() { toast.style.opacity = '0'; setTimeout(function() { toast.remove(); }, 300); }, 2500);
 }
+var toast = { success: showToast, error: showToast, info: showToast };
 
 // --- UTILITÁRIOS GLOBAIS ---
 function getEl(id) { return id ? document.getElementById(id) : null; }
@@ -1161,7 +1171,7 @@ function init() {
             if (btnSGD) { btnSGD.textContent = 'Enviar para SGD ↗'; btnSGD.disabled = false; }
             if (wr.ok) {
                 var wmsg = wr.submitted ? 'Anotação enviada para o SGD!' : 'Campo preenchido no SGD. ' + (wr.warning || 'Submeta manualmente.');
-                alert('✅ ' + wmsg);
+                toast.success(wmsg);
             } else {
                 alert('❌ Erro: ' + (wr.error || 'Falha desconhecida.'));
             }
@@ -1172,7 +1182,7 @@ function init() {
             if (btnPSAI) { btnPSAI.innerHTML = '<svg viewBox="0 0 24 24" class="icon-outline" stroke-width="1.5" style="width:14px;height:14px;"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg> Enviar para PSAI'; btnPSAI.disabled = false; }
             if (pr.ok) {
                 var pmsg = pr.submitted ? 'Detalhamento enviado para a PSAI no SGD!' : 'Campo preenchido na PSAI. ' + (pr.warning || 'Submeta manualmente.');
-                alert('✅ ' + pmsg);
+                toast.success(pmsg);
             } else {
                 alert('❌ Erro: ' + (pr.error || 'Falha desconhecida.'));
             }
@@ -1228,7 +1238,7 @@ function sendObsToSGD() {
     if (!c || !c.ssNumero) { alert('Este caso não possui número de SS.'); return; }
     var obs = (getVal('input-obs') || '').trim();
     if (!obs) { alert('O campo Observações está vazio.'); return; }
-    if (!confirm('Enviar observações para a SS ' + c.ssNumero + ' no SGD?\n\nRequisitos:\n• A página da SS ' + c.ssNumero + ' precisa estar aberta no navegador\n• A extensão DailyPlan v7.0 precisa estar instalada e atualizada\n\nDeseja continuar?')) return;
+    if (!confirm('Enviar observações para a SS ' + c.ssNumero + ' no SGD?\n\nRequisitos:\n• A página da SS ' + c.ssNumero + ' precisa estar aberta no navegador\n• A extensão DailyPlan v' + APP_VERSION + ' precisa estar instalada e atualizada\n\nDeseja continuar?')) return;
     var btn = getEl('btn-send-obs-sgd');
     if (btn) { btn.textContent = 'Enviando...'; btn.disabled = true; }
     var hasNativeAccess = (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage);
@@ -1238,7 +1248,7 @@ function sendObsToSGD() {
             if (!response) { alert('Extensão não respondeu. Verifique se está ativa.'); return; }
             if (response.ok) {
                 var msg = response.submitted ? 'Anotação enviada para a SS ' + c.ssNumero + ' no SGD!' : 'Campo preenchido na SS ' + c.ssNumero + '. ' + (response.warning || 'Submeta manualmente no SGD.');
-                alert('✅ ' + msg);
+                toast.success(msg);
             } else {
                 alert('❌ Erro: ' + (response.error || 'Falha desconhecida.'));
             }
@@ -1288,7 +1298,7 @@ function sendTechToPSAI() {
     if (!psaiCode) { alert('Este caso não possui código de PSAI. Preencha o campo "Cód. PSAI" na Visão Geral.'); return; }
     var content = buildTechContent();
     if (!content) { alert('Nenhum conteúdo no Detalhamento Técnico para enviar.'); return; }
-    if (!confirm('Enviar detalhamento técnico para a PSAI ' + psaiCode + ' no SGD?\n\nRequisitos:\n• A página da PSAI ' + psaiCode + ' precisa estar aberta no navegador\n• A extensão DailyPlan v7.0 precisa estar instalada e atualizada\n\nDeseja continuar?')) return;
+    if (!confirm('Enviar detalhamento técnico para a PSAI ' + psaiCode + ' no SGD?\n\nRequisitos:\n• A página da PSAI ' + psaiCode + ' precisa estar aberta no navegador\n• A extensão DailyPlan v' + APP_VERSION + ' precisa estar instalada e atualizada\n\nDeseja continuar?')) return;
     var btn = getEl('btn-send-tech-psai');
     if (btn) { btn.textContent = 'Enviando...'; btn.disabled = true; }
     var hasNativeAccess = (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage);
@@ -1298,7 +1308,7 @@ function sendTechToPSAI() {
             if (!response) { alert('Extensão não respondeu. Verifique se está ativa.'); return; }
             if (response.ok) {
                 var msg = response.submitted ? 'Detalhamento enviado para a PSAI ' + psaiCode + ' no SGD!' : 'Campo preenchido na PSAI ' + psaiCode + '. ' + (response.warning || 'Submeta manualmente no SGD.');
-                alert('✅ ' + msg);
+                toast.success(msg);
             } else {
                 alert('❌ Erro: ' + (response.error || 'Falha desconhecida.'));
             }
@@ -1555,7 +1565,7 @@ function cancelEditGroupName() {
 function addNewCase(workType) {
     if (adminViewMode) { alert('Visualização somente leitura. Volte aos seus dados primeiro.'); return; }
     var un = (currentUser && currentUser.username) ? currentUser.username : '';
-    var c = { id: Date.now(), title: "Nova Análise", lastUpdated: Date.now(), workType: workType || (workTypeFilter !== 'all' ? workTypeFilter : "PSAI"), caseType: "", psaiDesc: "", psaiLink: "", psaiNivel: "", psaiData: "", companyTest: "", psaiTestDomain: "", psaiDominioLocalEmpresa: "", psaiDominioWebEmpresa: "", psaiDominioLocalRepro: false, psaiDominioWebRepro: false, psaiCompanySentEsocial: false, psaiTestCertificate: "", psaiTestPassword: "", psaiPausadoPor: "", psaiReuniaoDuvida: "", neStatus: "", obs: "", saiGenerated: "", saiStatus: "", saiChangeLevel: "", saiScore: "", saiData: "", saiPriority: "", saiPrazo: "", saiAssunto: "", saiObs: "", ssNumero: "", ssData: "", status: "Em definição", priority: "null", deadline: "", links: [], ssTramites: [], researchByTopic: { saiLiberadas: [], ne: [], outros: [] }, managerReviews: [], tests: "", solution: "", createdBy: un, lastModifiedBy: un };
+    var c = { id: Date.now(), title: "Nova Análise", lastUpdated: Date.now(), workType: workType || (workTypeFilter !== 'all' ? workTypeFilter : "PSAI"), caseType: "", psaiDesc: "", psaiLink: "", psaiNivel: "", psaiData: "", companyTest: "", psaiTestDomain: "", psaiDominioLocalEmpresa: "", psaiDominioWebEmpresa: "", psaiDominioLocalRepro: false, psaiDominioWebRepro: false, psaiCompanySentEsocial: false, psaiPausadoPor: "", psaiReuniaoDuvida: "", neStatus: "", obs: "", saiGenerated: "", saiStatus: "", saiChangeLevel: "", saiScore: "", saiData: "", saiPriority: "", saiPrazo: "", saiAssunto: "", saiObs: "", ssNumero: "", ssData: "", status: "Em definição", priority: "null", deadline: "", links: [], ssTramites: [], researchByTopic: { saiLiberadas: [], ne: [], outros: [] }, managerReviews: [], tests: "", solution: "", createdBy: un, lastModifiedBy: un };
     cases.push(c);
     saveData(true);
     loadCase(c.id);
@@ -1734,8 +1744,6 @@ function loadCase(id) {
     setCheck('input-psai-dominio-local-repro', c.psaiDominioLocalRepro);
     setCheck('input-psai-dominio-web-repro', c.psaiDominioWebRepro);
     setCheck('input-psai-esocial', c.psaiCompanySentEsocial);
-    setVal('input-psai-certificado', c.psaiTestCertificate || '');
-    setVal('input-psai-senha-cert', c.psaiTestPassword || '');
     document.querySelectorAll('.psai-dominio-btn').forEach(function(btn) {
         var d = (btn.getAttribute('data-dominio') || '').trim();
         var v = (c.psaiTestDomain || '').trim();
@@ -1771,11 +1779,6 @@ function loadCase(id) {
     }
     renderResearch(c.researchByTopic);
     renderManagerReviews(c.managerReviews || []);
-    renderChecklist22(c.checklist22 || {});
-    setVal('input-ai-varedura', c.aiVaredura || '');
-    setVal('input-ai-fatores', c.aiFatores || '');
-    setVal('input-ai-sugestoes', c.aiSugestoes || '');
-    setVal('input-ai-notas', c.aiNotas || '');
     switchMainPanel(c.workType || 'PSAI');
     renderTramitesList(c.ssTramites || []);
     var btnSendSGD = getEl('btn-send-obs-sgd');
@@ -1806,8 +1809,6 @@ function saveCurrentCaseMemory() {
         c.psaiDominioLocalRepro = !!getEl('input-psai-dominio-local-repro') && getEl('input-psai-dominio-local-repro').checked;
         c.psaiDominioWebRepro = !!getEl('input-psai-dominio-web-repro') && getEl('input-psai-dominio-web-repro').checked;
         c.psaiCompanySentEsocial = !!getEl('input-psai-esocial') && getEl('input-psai-esocial').checked;
-        c.psaiTestCertificate = getVal('input-psai-certificado') || '';
-        c.psaiTestPassword = getVal('input-psai-senha-cert') || '';
         c.psaiPausadoPor = getVal('input-psai-pausado-por') || '';
         c.psaiReuniaoDuvida = getVal('input-psai-reuniao-duvida') || '';
     }
@@ -1845,12 +1846,6 @@ function saveCurrentCaseMemory() {
         var reason = (row.querySelector('.manager-reason') || {}).value || '';
         if (date || who || reason) c.managerReviews.push({ date: date, who: who, reason: reason });
     });
-
-    c.checklist22 = readChecklist22();
-    c.aiVaredura = getVal('input-ai-varedura') || '';
-    c.aiFatores = getVal('input-ai-fatores') || '';
-    c.aiSugestoes = getVal('input-ai-sugestoes') || '';
-    c.aiNotas = getVal('input-ai-notas') || '';
 }
 
 function saveCurrentCase() { saveCurrentCaseMemory(); saveData(false); }
@@ -1892,18 +1887,6 @@ function switchMainPanel(workType) {
     if (psaiEsocialCard) psaiEsocialCard.style.display = wt === 'PSAI' ? 'block' : 'none';
     if (wt === 'PSAI') togglePsaiStatusExtras();
     if (wt === 'SS') toggleSsSaNeCodigoVisibility();
-    var showChecklistStrategic = (wt !== 'SS' && wt !== 'SAI');
-    var tabCkBtn = document.querySelector('.tabs-header .tab-btn[data-tab="tab-checklist22"]');
-    var tabCk = getEl('tab-checklist22');
-    if (tabCkBtn) tabCkBtn.style.display = showChecklistStrategic ? '' : 'none';
-    if (!showChecklistStrategic && tabCk && tabCk.classList.contains('active')) {
-        document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
-        document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
-        var genBtn = getEl('btn-tab-general');
-        var genTab = getEl('tab-general');
-        if (genBtn) genBtn.classList.add('active');
-        if (genTab) genTab.classList.add('active');
-    }
 }
 
 function togglePsaiStatusExtras() {
@@ -2666,112 +2649,6 @@ function copyContextoResumoContent() {
     navigator.clipboard.writeText(text).then(function() { alert('Conteúdo (Contexto & Resumo) copiado!'); }).catch(function() { alert('Erro ao copiar.'); });
 }
 
-// --- CHECKLIST ESTRATÉGICO SEÇÃO 22 ---
-var CHECKLIST22_ITEMS = [
-    { key: 'dorResolvida', emoji: '\uD83C\uDFAF', label: 'Dor resolvida', desc: 'Entendo claramente a dor a ser resolvida e acredito que vamos resolver?' },
-    { key: 'onboarding', emoji: '\uD83D\uDE80', label: 'Onboarding', desc: 'Estamos facilitando o Onboarding de clientes?' },
-    { key: 'demandaSuporte', emoji: '\uD83C\uDFA7', label: 'Demanda de suporte', desc: 'Estamos mitigando impacto em demanda de suporte?' },
-    { key: 'reducaoCusto', emoji: '\uD83D\uDCB0', label: 'Redução de custo', desc: 'Existem oportunidades de reduzir custo (DW, Cloud, Manutenções, ...)?' },
-    { key: 'performance', emoji: '\u26A1', label: 'Performance', desc: 'Estamos contornando o risco de criar problemas de performance?' },
-    { key: 'jornadaCliente', emoji: '\uD83D\uDEE3\uFE0F', label: 'Jornada do cliente', desc: 'A entrega nasceu integrada com a jornada do cliente (Processos, Messenger, Portal do Cliente, Serviços Financeiros, ...)?' },
-    { key: 'medicaoSucesso', emoji: '\uD83D\uDCCA', label: 'Medição de sucesso', desc: 'A entrega está preparada para medir sucesso (observabilidades)?' },
-    { key: 'ia', emoji: '\uD83E\uDD16', label: 'IA', desc: 'A jornada/funcionalidade poderia ser reimaginada com IA?' },
-    { key: 'cloud', emoji: '\u2601\uFE0F', label: 'Cloud', desc: 'Estamos prevenindo a necessidade de reconstruir em cloud novamente?' },
-    { key: 'comunicacaoValor', emoji: '\uD83D\uDCE2', label: 'Comunicação de valor', desc: 'Estamos comunicando claramente a dor que resolvemos (proposta de valor) e acreditamos que com isso as áreas terão condições de vender e reter mais?' }
-];
-
-function renderChecklist22(data) {
-    var container = getEl('checklist22-items');
-    if (!container) return;
-    data = data || {};
-    container.innerHTML = CHECKLIST22_ITEMS.map(function(item) {
-        var val = data[item.key] || '';
-        var obs = data[item.key + '_obs'] || '';
-        return '<div style="border:1px solid var(--border-color); border-radius:8px; padding:12px; background:var(--bg-card);">' +
-            '<div style="display:flex; align-items:flex-start; gap:10px; margin-bottom:8px;">' +
-                '<span style="font-size:18px; flex-shrink:0; line-height:1;">' + item.emoji + '</span>' +
-                '<div style="flex:1; min-width:0;">' +
-                    '<div style="font-size:12px; font-weight:600; color:var(--text-primary); margin-bottom:2px;">' + escapeHtml(item.label) + '</div>' +
-                    '<div style="font-size:11px; color:var(--text-secondary); line-height:1.4;">' + escapeHtml(item.desc) + '</div>' +
-                '</div>' +
-                '<select class="ger-select checklist22-select" data-ck-key="' + item.key + '" style="width:auto; min-width:90px; font-size:11px; padding:4px 6px;">' +
-                    '<option value="">Pendente</option>' +
-                    '<option value="sim"' + (val === 'sim' ? ' selected' : '') + '>Sim</option>' +
-                    '<option value="nao"' + (val === 'nao' ? ' selected' : '') + '>Não</option>' +
-                    '<option value="na"' + (val === 'na' ? ' selected' : '') + '>N/A</option>' +
-                    '<option value="parcial"' + (val === 'parcial' ? ' selected' : '') + '>Parcial</option>' +
-                '</select>' +
-            '</div>' +
-            '<input type="text" class="ger-input checklist22-obs" data-ck-key="' + item.key + '_obs" value="' + escapeHtml(obs) + '" placeholder="Observação (opcional)" style="width:100%; font-size:11px; padding:5px 8px;">' +
-        '</div>';
-    }).join('');
-}
-
-function readChecklist22() {
-    var data = {};
-    document.querySelectorAll('.checklist22-select').forEach(function(sel) {
-        data[sel.getAttribute('data-ck-key')] = sel.value;
-    });
-    document.querySelectorAll('.checklist22-obs').forEach(function(inp) {
-        var v = (inp.value || '').trim();
-        if (v) data[inp.getAttribute('data-ck-key')] = v;
-    });
-    return data;
-}
-
-function copyAiAnalysisBlock() {
-    if (!currentId) return;
-    saveCurrentCaseMemory();
-    var parts = [];
-    parts.push('========== ANÁLISES DA IA ==========');
-    parts.push('');
-    parts.push('Varedura / resposta principal');
-    parts.push(getVal('input-ai-varedura') || '—');
-    parts.push('');
-    parts.push('Fatores e pontos de atenção');
-    parts.push(getVal('input-ai-fatores') || '—');
-    parts.push('');
-    parts.push('Sugestões e próximos passos');
-    parts.push(getVal('input-ai-sugestoes') || '—');
-    parts.push('');
-    parts.push('Notas adicionais');
-    parts.push(getVal('input-ai-notas') || '—');
-    var text = parts.join('\n');
-    navigator.clipboard.writeText(text).then(function() {
-        var btn = getEl('btn-copy-ai-analysis');
-        if (btn) { var orig = btn.innerHTML; btn.textContent = 'Copiado!'; setTimeout(function() { btn.innerHTML = orig; }, 1500); }
-    }).catch(function() { alert('Erro ao copiar.'); });
-}
-
-function copyChecklist22() {
-    if (!currentId) return;
-    saveCurrentCaseMemory();
-    var c = cases.find(function(x) { return x.id === currentId; });
-    if (!c) return;
-    var ck = c.checklist22 || {};
-    var labels = { sim: 'Sim', nao: 'Não', na: 'N/A', parcial: 'Parcial' };
-    var lines = [];
-    lines.push('<span style="color:#fa6400"><strong>CHECKLIST ESTRATÉGICO OBRIGATÓRIO</strong></span>');
-    lines.push('');
-    CHECKLIST22_ITEMS.forEach(function(item) {
-        var val = ck[item.key] || '';
-        var obs = ck[item.key + '_obs'] || '';
-        var status = val ? labels[val] || val : 'Pendente';
-        var line = '<strong> &bull; ' + escapeHtml(item.label) + ':</strong> ' + escapeHtml(status);
-        if (obs) line += ' ' + escapeHtml(obs);
-        lines.push(line);
-    });
-    lines.push('');
-    var total = CHECKLIST22_ITEMS.length;
-    var preenchidos = CHECKLIST22_ITEMS.filter(function(i) { return !!ck[i.key]; }).length;
-    lines.push('<strong>Preenchimento:</strong> ' + preenchidos + '/' + total);
-    var text = lines.join('\n');
-    navigator.clipboard.writeText(text).then(function() {
-        var btn = getEl('btn-copy-checklist22');
-        if (btn) { var orig = btn.innerHTML; btn.textContent = 'Copiado!'; setTimeout(function() { btn.innerHTML = orig; }, 1500); }
-    });
-}
-
 function copyTechnicalData() {
     if (!currentId) return;
     saveCurrentCaseMemory();
@@ -2983,8 +2860,6 @@ function copyTechnicalData() {
 
     var psaiExtraLines = [];
     psaiExtraLines.push('Empresa enviada para eSocial: ' + (c.psaiCompanySentEsocial ? 'Sim' : 'Não'));
-    if (c.psaiTestCertificate) psaiExtraLines.push('Certificado: ' + escapeHtml(c.psaiTestCertificate));
-    if (c.psaiTestPassword) psaiExtraLines.push('Senha: ' + escapeHtml(c.psaiTestPassword));
     var psaiExtrasHtml = '<br>' + psaiExtraLines.join('<br>');
     var psaiExtrasPlain = '\n' + psaiExtraLines.map(function(l) { return l.replace(/<[^>]*>/g, ''); }).join('\n');
 
@@ -3456,7 +3331,7 @@ function saveBackupToOneDrive() {
             writable.write(encoded);
             return writable.close();
         });
-    }).then(function() { alert('Backup salvo! Se escolheu uma pasta do OneDrive, o arquivo será sincronizado para a nuvem.'); }).catch(function(err) {
+    }).then(function() { toast.success('Backup salvo! Se escolheu uma pasta do OneDrive, o arquivo será sincronizado para a nuvem.'); }).catch(function(err) {
         if (err.name !== 'AbortError') { exportData(); alert('Não foi possível salvar na pasta. O backup foi baixado. Salve-o manualmente na pasta do OneDrive.'); }
     });
 }
@@ -3521,7 +3396,7 @@ function importData(input) {
         var importPayload = { 'myCasesV14': JSON.stringify(cases), 'myGroupsV1': JSON.stringify(groups) };
         Object.keys(importPayload).forEach(function(k) { localStorage.setItem(k, importPayload[k]); });
         toggleModal('modal-settings', false);
-        alert('Importação concluída! ' + addedCases + ' análise(s) e ' + addedGroups + ' grupo(s) adicionados.');
+        toast.success('Importação concluída! ' + addedCases + ' análise(s) e ' + addedGroups + ' grupo(s) adicionados.');
         if (firebaseUid && typeof db !== 'undefined') {
             var update = { lastUpdated: firebase.firestore.FieldValue.serverTimestamp() };
             Object.keys(importPayload).forEach(function(k) { update[k] = importPayload[k]; });
@@ -3934,8 +3809,6 @@ document.addEventListener('DOMContentLoaded', function() {
         'btn-select-mode': enterSelectMode,
         'btn-cancel-select': exitSelectMode,
         'btn-delete-selected': deleteSelectedCases,
-        'btn-users-from-settings': function() { },
-        'btn-change-password': function() { },
         'close-change-password': function() { },
         'close-instrucoes-atualizar': () => toggleModal('modal-instrucoes-atualizar', false),
         'btn-group-view-back': closeGroupView,
@@ -3978,8 +3851,8 @@ document.addEventListener('DOMContentLoaded', function() {
         'btn-go': openPsaiLink, 
 'btn-add-sa': addSaFromForm,
         'btn-add-manager': () => addManagerReviewRow(),
-        'btn-save-gen': saveCurrentCase, 'btn-save-tech': saveCurrentCase, 'btn-save-checklist22': saveCurrentCase, 'btn-save-ai-analysis': saveCurrentCase, 'btn-delete-gen': deleteCase, 'btn-delete-tech': deleteCase,
-        'btn-copy-tech': copyTechnicalData, 'btn-copy-checklist22': copyChecklist22, 'btn-copy-ai-analysis': copyAiAnalysisBlock, 'btn-copy-contexto': copyContextoResumoContent, 'btn-export-single-gen': exportSingleCase, 'btn-export-single-tech': exportSingleCase,
+        'btn-save-gen': saveCurrentCase, 'btn-save-tech': saveCurrentCase, 'btn-delete-gen': deleteCase, 'btn-delete-tech': deleteCase,
+        'btn-copy-tech': copyTechnicalData, 'btn-copy-contexto': copyContextoResumoContent, 'btn-export-single-gen': exportSingleCase, 'btn-export-single-tech': exportSingleCase,
         'btn-ler-ss': function() { setVal('ss-html-paste', ''); toggleModal('modal-ler-ss', true); },
         'close-ler-ss': () => toggleModal('modal-ler-ss', false),
         'btn-ss-upload-html': function() { var f = getEl('file-ss-html'); if (f) f.click(); },
@@ -4153,7 +4026,15 @@ document.addEventListener('DOMContentLoaded', function() {
         firebase.auth().onAuthStateChanged(function(fbUser) {
             _onAuthReady(fbUser, function() { runApp(); });
         });
+        // Rede de segurança: se a verificação de sessão demorar demais, não trava em "Carregando".
+        setTimeout(function() {
+            if (document.body.classList.contains('auth-checking')) {
+                document.body.classList.remove('auth-checking');
+                document.body.classList.add('auth-required');
+            }
+        }, 10000);
     } else {
+        document.body.classList.remove('auth-checking');
         document.body.classList.remove('auth-required');
         runApp();
     }

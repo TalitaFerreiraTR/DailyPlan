@@ -10,7 +10,19 @@ let savedFocusElement = null;
 let autoSaveTimer = null;
 var currentUser = null; // { username, role: 'normal'|'gerente'|'desenvolvedor' }
 
-var APP_VERSION = '6.0';
+var APP_VERSION = '7.1.0';
+function showToast(msg) {
+    var existing = document.querySelector('.dp-toast');
+    if (existing) existing.remove();
+    var toastEl = document.createElement('div');
+    toastEl.className = 'dp-toast';
+    toastEl.textContent = msg;
+    toastEl.style.cssText = 'position:fixed; bottom:24px; right:24px; background:var(--tr-orange); color:#fff; padding:10px 20px; border-radius:8px; font-size:13px; font-weight:600; z-index:10001; box-shadow:0 4px 16px rgba(0,0,0,0.3); opacity:0; transition:opacity 0.3s;';
+    document.body.appendChild(toastEl);
+    requestAnimationFrame(function() { toastEl.style.opacity = '1'; });
+    setTimeout(function() { toastEl.style.opacity = '0'; setTimeout(function() { toastEl.remove(); }, 300); }, 2500);
+}
+var toast = { success: showToast, error: showToast, info: showToast };
 var _useChrome = (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local);
 
 function storageGet(keys, callback) {
@@ -231,7 +243,7 @@ function sendObsToSGD() {
     if (!c || !c.ssNumero) { alert('Este caso não possui número de SS.'); return; }
     var obs = (getVal('input-obs') || '').trim();
     if (!obs) { alert('O campo Observações está vazio.'); return; }
-    if (!confirm('Enviar observações para a SS ' + c.ssNumero + ' no SGD?\n\nRequisitos:\n• A página da SS ' + c.ssNumero + ' precisa estar aberta no navegador\n• A extensão DailyPlan v7.0 precisa estar instalada e atualizada\n\nDeseja continuar?')) return;
+    if (!confirm('Enviar observações para a SS ' + c.ssNumero + ' no SGD?\n\nRequisitos:\n• A página da SS ' + c.ssNumero + ' precisa estar aberta no navegador\n• A extensão DailyPlan v' + APP_VERSION + ' precisa estar instalada e atualizada\n\nDeseja continuar?')) return;
     var btn = getEl('btn-send-obs-sgd');
     if (btn) { btn.textContent = 'Enviando...'; btn.disabled = true; }
     var hasNativeAccess = (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage);
@@ -241,7 +253,7 @@ function sendObsToSGD() {
             if (!response) { alert('Extensão não respondeu. Verifique se está ativa.'); return; }
             if (response.ok) {
                 var msg = response.submitted ? 'Anotação enviada para a SS ' + c.ssNumero + ' no SGD!' : 'Campo preenchido na SS ' + c.ssNumero + '. ' + (response.warning || 'Submeta manualmente no SGD.');
-                alert('✅ ' + msg);
+                toast.success(msg);
             } else {
                 alert('❌ Erro: ' + (response.error || 'Falha desconhecida.'));
             }
@@ -291,7 +303,7 @@ function sendTechToPSAI() {
     if (!psaiCode) { alert('Este caso não possui código de PSAI. Preencha o campo "Cód. PSAI" na Visão Geral.'); return; }
     var content = buildTechContent();
     if (!content) { alert('Nenhum conteúdo no Detalhamento Técnico para enviar.'); return; }
-    if (!confirm('Enviar detalhamento técnico para a PSAI ' + psaiCode + ' no SGD?\n\nRequisitos:\n• A página da PSAI ' + psaiCode + ' precisa estar aberta no navegador\n• A extensão DailyPlan v7.0 precisa estar instalada e atualizada\n\nDeseja continuar?')) return;
+    if (!confirm('Enviar detalhamento técnico para a PSAI ' + psaiCode + ' no SGD?\n\nRequisitos:\n• A página da PSAI ' + psaiCode + ' precisa estar aberta no navegador\n• A extensão DailyPlan v' + APP_VERSION + ' precisa estar instalada e atualizada\n\nDeseja continuar?')) return;
     var btn = getEl('btn-send-tech-psai');
     if (btn) { btn.textContent = 'Enviando...'; btn.disabled = true; }
     var hasNativeAccess = (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage);
@@ -301,7 +313,7 @@ function sendTechToPSAI() {
             if (!response) { alert('Extensão não respondeu. Verifique se está ativa.'); return; }
             if (response.ok) {
                 var msg = response.submitted ? 'Detalhamento enviado para a PSAI ' + psaiCode + ' no SGD!' : 'Campo preenchido na PSAI ' + psaiCode + '. ' + (response.warning || 'Submeta manualmente no SGD.');
-                alert('✅ ' + msg);
+                toast.success(msg);
             } else {
                 alert('❌ Erro: ' + (response.error || 'Falha desconhecida.'));
             }
@@ -556,7 +568,7 @@ function cancelEditGroupName() {
 
 function addNewCase(workType) {
     var un = (currentUser && currentUser.username) ? currentUser.username : '';
-    var c = { id: Date.now(), title: "Nova Análise", lastUpdated: Date.now(), workType: workType || (workTypeFilter !== 'all' ? workTypeFilter : "PSAI"), caseType: "", psaiDesc: "", psaiLink: "", psaiNivel: "", psaiData: "", companyTest: "", psaiTestDomain: "", psaiDominioLocalEmpresa: "", psaiDominioWebEmpresa: "", psaiDominioLocalRepro: false, psaiDominioWebRepro: false, psaiCompanySentEsocial: false, psaiTestCertificate: "", psaiTestPassword: "", psaiPausadoPor: "", psaiReuniaoDuvida: "", neStatus: "", obs: "", saiGenerated: "", saiStatus: "", saiChangeLevel: "", saiScore: "", saiData: "", saiPriority: "", saiPrazo: "", saiAssunto: "", saiObs: "", ssNumero: "", ssData: "", status: "Em definição", priority: "null", deadline: "", links: [], ssTramites: [], researchByTopic: { saiLiberadas: [], ne: [], outros: [] }, managerReviews: [], tests: "", solution: "", createdBy: un, lastModifiedBy: un };
+    var c = { id: Date.now(), title: "Nova Análise", lastUpdated: Date.now(), workType: workType || (workTypeFilter !== 'all' ? workTypeFilter : "PSAI"), caseType: "", psaiDesc: "", psaiLink: "", psaiNivel: "", psaiData: "", companyTest: "", psaiTestDomain: "", psaiDominioLocalEmpresa: "", psaiDominioWebEmpresa: "", psaiDominioLocalRepro: false, psaiDominioWebRepro: false, psaiCompanySentEsocial: false, psaiPausadoPor: "", psaiReuniaoDuvida: "", neStatus: "", obs: "", saiGenerated: "", saiStatus: "", saiChangeLevel: "", saiScore: "", saiData: "", saiPriority: "", saiPrazo: "", saiAssunto: "", saiObs: "", ssNumero: "", ssData: "", status: "Em definição", priority: "null", deadline: "", links: [], ssTramites: [], researchByTopic: { saiLiberadas: [], ne: [], outros: [] }, managerReviews: [], tests: "", solution: "", createdBy: un, lastModifiedBy: un };
     cases.push(c);
     saveData(true);
     loadCase(c.id);
@@ -675,8 +687,6 @@ function loadCase(id) {
     setCheck('input-psai-dominio-local-repro', c.psaiDominioLocalRepro);
     setCheck('input-psai-dominio-web-repro', c.psaiDominioWebRepro);
     setCheck('input-psai-esocial', c.psaiCompanySentEsocial);
-    setVal('input-psai-certificado', c.psaiTestCertificate || '');
-    setVal('input-psai-senha-cert', c.psaiTestPassword || '');
     document.querySelectorAll('.psai-dominio-btn').forEach(function(btn) {
         var d = (btn.getAttribute('data-dominio') || '').trim();
         var v = (c.psaiTestDomain || '').trim();
@@ -741,8 +751,6 @@ function saveCurrentCaseMemory() {
         c.psaiDominioLocalRepro = !!getEl('input-psai-dominio-local-repro') && getEl('input-psai-dominio-local-repro').checked;
         c.psaiDominioWebRepro = !!getEl('input-psai-dominio-web-repro') && getEl('input-psai-dominio-web-repro').checked;
         c.psaiCompanySentEsocial = !!getEl('input-psai-esocial') && getEl('input-psai-esocial').checked;
-        c.psaiTestCertificate = getVal('input-psai-certificado') || '';
-        c.psaiTestPassword = getVal('input-psai-senha-cert') || '';
         c.psaiPausadoPor = getVal('input-psai-pausado-por') || '';
         c.psaiReuniaoDuvida = getVal('input-psai-reuniao-duvida') || '';
     }
@@ -1761,8 +1769,6 @@ function copyTechnicalData() {
 
     var psaiExtraLines = [];
     psaiExtraLines.push('Empresa enviada para eSocial: ' + (c.psaiCompanySentEsocial ? 'Sim' : 'Não'));
-    if (c.psaiTestCertificate) psaiExtraLines.push('Certificado: ' + escapeHtml(c.psaiTestCertificate));
-    if (c.psaiTestPassword) psaiExtraLines.push('Senha: ' + escapeHtml(c.psaiTestPassword));
     var psaiExtrasHtml = '<br>' + psaiExtraLines.join('<br>');
     var psaiExtrasPlain = '\n' + psaiExtraLines.map(function(l) { return l.replace(/<[^>]*>/g, ''); }).join('\n');
 
@@ -2167,7 +2173,7 @@ function saveBackupToOneDrive() {
             writable.write(data);
             return writable.close();
         });
-    }).then(function() { alert('Backup salvo! Se escolheu uma pasta do OneDrive, o arquivo será sincronizado para a nuvem.'); }).catch(function(err) {
+    }).then(function() { toast.success('Backup salvo! Se escolheu uma pasta do OneDrive, o arquivo será sincronizado para a nuvem.'); }).catch(function(err) {
         if (err.name !== 'AbortError') { exportData(); alert('Não foi possível salvar na pasta. O backup foi baixado. Salve-o manualmente na pasta do OneDrive.'); }
     });
 }
@@ -2561,8 +2567,6 @@ document.addEventListener('DOMContentLoaded', function() {
         'btn-save-reminder': saveReminderSettings,
         'settings-theme-light': function() { toggleTheme('light'); var l = getEl('settings-theme-light'); var d = getEl('settings-theme-dark'); if (l) { l.classList.add('btn-primary'); l.classList.remove('btn-secondary'); } if (d) { d.classList.remove('btn-primary'); d.classList.add('btn-secondary'); } },
         'settings-theme-dark': function() { toggleTheme('dark'); var l = getEl('settings-theme-light'); var d = getEl('settings-theme-dark'); if (d) { d.classList.add('btn-primary'); d.classList.remove('btn-secondary'); } if (l) { l.classList.remove('btn-primary'); l.classList.add('btn-secondary'); } },
-        'btn-users-from-settings': function() { },
-        'btn-change-password': function() { },
         'close-change-password': function() { },
         'close-instrucoes-atualizar': () => toggleModal('modal-instrucoes-atualizar', false),
         'btn-group-view-back': closeGroupView,
