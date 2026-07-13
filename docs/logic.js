@@ -1140,13 +1140,19 @@ function init() {
         }
         if (e.data && e.data.type === 'DP_SCRAPE_SS_RESULT') {
             var resp = e.data.data || {};
+            var _mode = _ssScrapeMode; _ssScrapeMode = null;
+            var _tid = _ssScrapeTargetId; _ssScrapeTargetId = null;
+            var _tkey = _ssScrapeTargetKey; _ssScrapeTargetKey = null;
+            var _isAuto = (_mode === 'auto');
+            if (_isAuto && _tid != null && _tid !== currentId) return; // usuário trocou de caso — ignora
             if (resp.html) {
                 var data = parseSSHtml(resp.html);
-                applyParsedSS(data);
+                applyParsedSS(data, { force: !_isAuto }); // manual = substitui; auto = só preenche o que está vazio
                 var badge = getEl('ss-tramites-badge');
                 if (badge) badge.textContent = (data.tramitesCount || 0) + ((data.tramitesCount || 0) === 1 ? ' Trâmite' : ' Trâmites');
             } else if (resp.error) {
-                alert(resp.error);
+                if (_isAuto) { if (_tkey) delete _ssAutoAttempt[_tkey]; } // auto = silencioso, permite tentar de novo depois
+                else alert(resp.error);
             }
         }
         if (e.data && e.data.type === 'DP_WRITE_SS_RESULT') {
@@ -1779,6 +1785,7 @@ function loadCase(id) {
     analyzeData(id);
     renderSidebar();
     if (migratedNe) saveData(true);
+    autoReadSSIfNeeded();
 }
 
 function saveCurrentCaseMemory() {
@@ -1857,7 +1864,7 @@ function tryApplyPendingSS() {
         if (!cases.some(function(c) { return c.id === id; })) return;
         loadCase(id);
         var data = parseSSHtml(r.pendingSSHtml);
-        applyParsedSS(data);
+        applyParsedSS(data, { force: true });
         storageRemove(['pendingSSHtml', 'pendingSSCaseId']);
         renderSidebar();
     });
@@ -2263,31 +2270,123 @@ function _ssEmpty(val) {
     return false;
 }
 
-function applyParsedSS(data) {
+var _ssScrapeMode = null;      // 'auto' | 'manual' | null (modo da leitura de SS em andamento)
+var _ssScrapeTargetId = null;  // id do caso alvo da leitura
+var _ssScrapeTargetKey = null; // chave id|numero da tentativa automática
+var _ssAutoAttempt = {};       // controla auto-leitura por caso (evita repetir/loop)
+
+/** Ao abrir/criar uma análise de SS com número, tenta ler a SS da aba automaticamente
+ *  (silencioso; usa force:false para nunca sobrescrever o que já está preenchido). */
+function autoReadSSIfNeeded() {
+    if (!currentId) return;
+    var c = cases.find(function(x) { return x.id === currentId; });
+    if (!c || c.workType !== 'SS') return;
+    var ssNumero = (getVal('input-ss-numero') || c.ssNumero || '').trim();
+    if (!ssNumero) return;
+    var hasContent = !_ssEmpty(c.ssTramites) || !_ssEmpty(c.ssAssunto) || !_ssEmpty(c.ssProblema) || !_ssEmpty(c.ssPassos);
+    if (hasContent) return; // já lido/preenchido — não puxa de novo
+    var key = c.id + '|' + ssNumero;
+    if (_ssAutoAttempt[key]) return; // já tentou nesta sessão
+    _ssAutoAttempt[key] = true;
+    _ssScrapeMode = 'auto';
+    _ssScrapeTargetId = c.id;
+    _ssScrapeTargetKey = key;
+    if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.query) {
+        chrome.tabs.query({ url: '*://sgd.dominiosistemas.com.br/sgsa/faces/ss.html*' }, function(tabs) {
+            var tab = null;
+            for (var i = 0; tabs && i < tabs.length; i++) { var m = (tabs[i].url || '').match(/[?&]ss=([0-9]+)/); if (m && m[1] === ssNumero) { tab = tabs[i]; break; } }
+            if (!tab) { delete _ssAutoAttempt[key]; _ssScrapeMode = null; return; }
+            chrome.tabs.sendMessage(tab.id, { action: 'SCRAPE_SS' }, function(response) {
+                _ssScrapeMode = null;
+                if (chrome.runtime.lastError) { delete _ssAutoAttempt[key]; return; }
+                if (response && response.html && _ssScrapeTargetId === currentId) {
+                    var data = parseSSHtml(response.html);
+                    applyParsedSS(data, { force: false });
+                    var badge = getEl('ss-tramites-badge');
+                    if (badge) badge.textContent = (data.tramitesCount || 0) + ((data.tramitesCount || 0) === 1 ? ' Trâmite' : ' Trâmites');
+                } else { delete _ssAutoAttempt[key]; }
+            });
+        });
+    } else {
+        try { window.postMessage({ type: 'DP_REQUEST_SCRAPE_SS', ssNumero: ssNumero }, window.location.origin); }
+        catch (e) { delete _ssAutoAttempt[key]; _ssScrapeMode = null; }
+    }
+}
+
+function applyParsedSS(data, opts) {
     if (!currentId) return;
     var c = cases.find(function(x) { return x.id === currentId; });
     if (!c) return;
+    var force = opts && opts.force;
     var titleParts = [];
-    if (data.numero && _ssEmpty(c.ssNumero)) { c.ssNumero = data.numero; setVal('input-ss-numero', data.numero); }
-    if (data.ssData && _ssEmpty(c.ssData)) { c.ssData = data.ssData; setVal('input-ss-data', data.ssData); }
-    if (data.subtopic && _ssEmpty(c.ssSubtopic)) { c.ssSubtopic = data.subtopic; setVal('input-ss-subtopico', data.subtopic); }
-    if (data.tipo !== undefined && _ssEmpty(c.ssTipo)) c.ssTipo = data.tipo;
+
+    function applyNumero() {
+        if (force ? data.numero !== undefined : (data.numero && _ssEmpty(c.ssNumero))) {
+            c.ssNumero = data.numero || '';
+            setVal('input-ss-numero', c.ssNumero);
+        }
+    }
+    function applySsData() {
+        if (force ? data.ssData !== undefined : (data.ssData && _ssEmpty(c.ssData))) {
+            c.ssData = data.ssData || '';
+            setVal('input-ss-data', c.ssData);
+        }
+    }
+    function applySubtopic() {
+        if (force ? data.subtopic !== undefined : (data.subtopic && _ssEmpty(c.ssSubtopic))) {
+            c.ssSubtopic = data.subtopic || '';
+            setVal('input-ss-subtopico', c.ssSubtopic);
+        }
+    }
+    function applyTipo() {
+        if (force ? data.tipo !== undefined : (data.tipo !== undefined && _ssEmpty(c.ssTipo))) {
+            c.ssTipo = data.tipo || '';
+        }
+    }
+    applyNumero();
+    applySsData();
+    applySubtopic();
+    applyTipo();
     titleParts = [c.ssNumero, c.ssTipo, c.ssSubtopic].filter(Boolean);
     if (titleParts.length) { var autoTitle = titleParts.join(' · '); setVal('input-title', autoTitle); c.title = autoTitle; }
-    if (data.assunto && _ssEmpty(c.ssAssunto)) { c.ssAssunto = data.assunto; setVal('input-ss-assunto', data.assunto); }
-    if (data.problema && _ssEmpty(c.ssProblema)) { c.ssProblema = data.problema; setVal('input-ss-problema', data.problema); }
-    if (data.passos && _ssEmpty(c.ssPassos)) { c.ssPassos = data.passos; setVal('input-ss-passos', data.passos); }
-    if (data.bancoCliente !== undefined) { c.ssBancoCliente = !!data.bancoCliente; setCheck('input-ss-banco-cliente', data.bancoCliente); }
-    if (data.bancoClienteConteudo != null && _ssEmpty(c.ssBancoClienteConteudo)) { c.ssBancoClienteConteudo = data.bancoClienteConteudo; setVal('input-ss-banco-cliente-conteudo', data.bancoClienteConteudo); }
+
+    if (force ? data.assunto !== undefined : (data.assunto && _ssEmpty(c.ssAssunto))) {
+        c.ssAssunto = data.assunto || '';
+        setVal('input-ss-assunto', c.ssAssunto);
+    }
+    if (force ? data.problema !== undefined : (data.problema && _ssEmpty(c.ssProblema))) {
+        c.ssProblema = data.problema || '';
+        setVal('input-ss-problema', c.ssProblema);
+    }
+    if (force ? data.passos !== undefined : (data.passos && _ssEmpty(c.ssPassos))) {
+        c.ssPassos = data.passos || '';
+        setVal('input-ss-passos', c.ssPassos);
+    }
+    if (data.bancoCliente !== undefined) {
+        c.ssBancoCliente = !!data.bancoCliente;
+        setCheck('input-ss-banco-cliente', data.bancoCliente);
+    }
+    if (force ? data.bancoClienteConteudo !== undefined : (data.bancoClienteConteudo != null && _ssEmpty(c.ssBancoClienteConteudo))) {
+        c.ssBancoClienteConteudo = data.bancoClienteConteudo || '';
+        setVal('input-ss-banco-cliente-conteudo', c.ssBancoClienteConteudo);
+    }
     toggleBancoClienteConteudoVisibility();
-    if (data.detalheTecnico != null && _ssEmpty(c.ssDetalheTecnico)) { c.ssDetalheTecnico = data.detalheTecnico; setVal('input-ss-detalhe-tecnico', data.detalheTecnico); }
-    if (data.tramites && data.tramites.length && _ssEmpty(c.ssTramites)) {
-        c.ssTramites = data.tramites.slice();
-        c.ssTramitesCount = data.tramites.length;
-        c.ssResumoAI = (data.tramitesSummary || '').trim() || data.tramites.map(function(t) { return (t.date ? t.date + ' - ' : '') + (t.user ? t.user + ': ' : '') + (t.desc || '—'); }).join('\n');
-        renderTramitesList(c.ssTramites);
-    } else renderTramitesList(c.ssTramites || []);
-    if (data.tramitesCount != null && (c.ssTramitesCount == null || c.ssTramitesCount === undefined)) c.ssTramitesCount = data.tramitesCount;
+    if (force ? data.detalheTecnico !== undefined : (data.detalheTecnico != null && _ssEmpty(c.ssDetalheTecnico))) {
+        c.ssDetalheTecnico = data.detalheTecnico || '';
+        setVal('input-ss-detalhe-tecnico', c.ssDetalheTecnico);
+    }
+
+    if (force ? data.tramites !== undefined : (data.tramites && data.tramites.length && _ssEmpty(c.ssTramites))) {
+        c.ssTramites = data.tramites ? data.tramites.slice() : [];
+        c.ssTramitesCount = data.tramitesCount != null ? data.tramitesCount : (c.ssTramites ? c.ssTramites.length : 0);
+        c.ssResumoAI = (data.tramitesSummary || '').trim() || (c.ssTramites && c.ssTramites.length ? c.ssTramites.map(function(t) { return (t.date ? t.date + ' - ' : '') + (t.user ? t.user + ': ' : '') + (t.desc || '—'); }).join('\n') : '');
+        renderTramitesList(c.ssTramites || []);
+    } else {
+        renderTramitesList(c.ssTramites || []);
+    }
+    if (!force && data.tramitesCount != null && (c.ssTramitesCount == null || c.ssTramitesCount === undefined)) c.ssTramitesCount = data.tramitesCount;
+    if (force && data.tramitesCount != null) c.ssTramitesCount = data.tramitesCount;
+
     var badge = getEl('ss-tramites-badge');
     if (badge) {
         var n = c.ssTramitesCount != null ? c.ssTramitesCount : 0;
@@ -2297,7 +2396,7 @@ function applyParsedSS(data) {
     if (data.sscs && data.sscs.length) {
         c.links = (c.links || []).slice();
         data.sscs.forEach(function(item) {
-            if (item.code && !c.links.some(function(l) { return l.code === item.code; })) c.links.push({ code: item.code, link: item.link || '', desc: item.desc || '' });
+            if (item.code && !c.links.some(function(l) { return String(l.code) === String(item.code); })) c.links.push({ code: String(item.code).trim(), link: item.link || '', desc: item.desc || '' });
         });
     }
     updateSsTitleAuto(c);
@@ -3747,6 +3846,9 @@ document.addEventListener('DOMContentLoaded', function() {
         var val = getVal('input-ss-numero');
         if (val) openUrlInNewTab(`https://sgd.dominiosistemas.com.br/sgsa/faces/ss.html?ss=${encodeURIComponent(val)}`); else alert("Informe o código SS!");
     });
+    // Auto-leitura da SS ao informar o código (fluxo "criar análise")
+    var _inputSsNumeroAuto = getEl('input-ss-numero');
+    if (_inputSsNumeroAuto) _inputSsNumeroAuto.addEventListener('blur', function() { autoReadSSIfNeeded(); });
 
     var btnAddNote = getEl('btn-add-note');
     if (btnAddNote) btnAddNote.addEventListener('click', addNote);
@@ -3885,7 +3987,7 @@ document.addEventListener('DOMContentLoaded', function() {
             var html = getVal('ss-html-paste') || '';
             if (!html.trim()) { alert('Cole o HTML da SS ou envie um arquivo.'); return; }
             var data = parseSSHtml(html);
-            applyParsedSS(data);
+            applyParsedSS(data, { force: true });
             toggleModal('modal-ler-ss', false);
         },
         'btn-ler-ss-aba': function() {
@@ -3900,12 +4002,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (!tab) { alert('Nenhuma aba aberta com a SS ' + ssNumero + '.'); return; }
                     chrome.tabs.sendMessage(tab.id, { action: 'SCRAPE_SS' }, function(response) {
                         if (chrome.runtime.lastError) { alert('Não foi possível ler a aba. Recarregue a página da SS (F5) e tente de novo.'); return; }
-                        if (response && response.html) { var data = parseSSHtml(response.html); applyParsedSS(data); var badge = getEl('ss-tramites-badge'); if (badge) badge.textContent = (data.tramitesCount || 0) + ((data.tramitesCount || 0) === 1 ? ' Trâmite' : ' Trâmites'); }
+                        if (response && response.html) { var data = parseSSHtml(response.html); applyParsedSS(data, { force: true }); var badge = getEl('ss-tramites-badge'); if (badge) badge.textContent = (data.tramitesCount || 0) + ((data.tramitesCount || 0) === 1 ? ' Trâmite' : ' Trâmites'); }
                         else { alert(response && response.error ? response.error : 'Resposta inválida da aba.'); }
                     });
                 });
                 return;
             }
+            _ssScrapeMode = 'manual'; _ssScrapeTargetId = currentId; _ssScrapeTargetKey = null;
             window.postMessage({ type: 'DP_REQUEST_SCRAPE_SS', ssNumero: ssNumero }, window.location.origin);
             alert('Lendo SS da aba aberta... Aguarde um momento.');
         },

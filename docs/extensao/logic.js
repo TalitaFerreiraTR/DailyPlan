@@ -173,7 +173,11 @@ function init() {
             if (changes.myCasesV14 && changes.myCasesV14.newValue) { try { cases = JSON.parse(changes.myCasesV14.newValue); } catch (e) {} renderSidebar(); }
             if (changes.myGroupsV1 && changes.myGroupsV1.newValue) { try { groups = JSON.parse(changes.myGroupsV1.newValue); } catch (e) {} renderSidebar(); renderGroupsList(); }
             if (changes.generalNotesList && changes.generalNotesList.newValue) { try { notes = JSON.parse(changes.generalNotesList.newValue); } catch (e) {} renderNotes(); }
-            if (changes.pendingSSHtml || changes.pendingSSCaseId) tryApplyPendingSS();
+            // Só reaplicar quando o injector gravar pendência nova; ao remover (newValue vazio) não chamar — evita triplicar efeitos
+            var pHtml = changes.pendingSSHtml;
+            var pId = changes.pendingSSCaseId;
+            var hasNewPending = (pHtml && pHtml.newValue) || (pId && pId.newValue);
+            if (hasNewPending) tryApplyPendingSS();
         });
     } else {
         window.addEventListener('storage', function(e) {
@@ -780,18 +784,28 @@ function saveCurrentCaseMemory() {
 
 function saveCurrentCase() { saveCurrentCaseMemory(); saveData(false); }
 
+var _pendingSsApplyLock = false;
+
 /** Se houver HTML pendente do botão flutuante "Ler SS", carrega o caso e preenche todos os campos. */
 function tryApplyPendingSS() {
     storageGet(['pendingSSHtml', 'pendingSSCaseId', 'myCasesV14'], function(r) {
         if (!r.pendingSSHtml || !r.pendingSSCaseId) return;
-        if (r.myCasesV14) { try { cases = JSON.parse(r.myCasesV14); } catch (e) {} }
+        if (_pendingSsApplyLock) return;
+        _pendingSsApplyLock = true;
+        var html = r.pendingSSHtml;
         var id = r.pendingSSCaseId;
-        if (!cases.some(function(c) { return c.id === id; })) return;
-        loadCase(id);
-        var data = parseSSHtml(r.pendingSSHtml);
-        applyParsedSS(data);
-        storageRemove(['pendingSSHtml', 'pendingSSCaseId']);
-        renderSidebar();
+        storageRemove(['pendingSSHtml', 'pendingSSCaseId'], function() {
+            try {
+                if (r.myCasesV14) { try { cases = JSON.parse(r.myCasesV14); } catch (e) {} }
+                if (!cases.some(function(c) { return c.id === id; })) return;
+                loadCase(id);
+                var data = parseSSHtml(html);
+                applyParsedSS(data, { force: true });
+                renderSidebar();
+            } finally {
+                _pendingSsApplyLock = false;
+            }
+        });
     });
 }
 
@@ -912,12 +926,12 @@ function parseTramitesFromDoc(doc) {
     if (!anchors.length) return out;
     var lines = [];
     for (var i = 0; i < anchors.length; i++) {
-        var table = anchors[i].closest('table.tableVisualizacao');
+        var table = anchors[i].closest('table.tableVisualizacao') || anchors[i].closest('table[class*="tableVisualizacao"]');
         if (!table) continue;
         var dateStr = '';
         var userStr = '';
         var descStr = '';
-        var destaqueTds = table.querySelectorAll('td.tableVisualizacaoDestaque');
+        var destaqueTds = table.querySelectorAll('td.tableVisualizacaoDestaque, td[class*="tableVisualizacaoDestaque"]');
         for (var d = 0; d < destaqueTds.length; d++) {
             var txt = getElementText(destaqueTds[d]);
             if (txt.indexOf('Data:') !== -1) {
@@ -935,7 +949,7 @@ function parseTramitesFromDoc(doc) {
         }
         var justifyDiv = table.querySelector('div[align="justify"]');
         if (justifyDiv) descStr = getElementTextWithBreaks(justifyDiv);
-        else { var tdHtml = table.querySelector('td.tableVisualizacaoHtml'); if (tdHtml) descStr = getElementTextWithBreaks(tdHtml); }
+        else { var tdHtml = table.querySelector('td.tableVisualizacaoHtml, td[class*="tableVisualizacaoHtml"]'); if (tdHtml) descStr = getElementTextWithBreaks(tdHtml); }
         descStr = (descStr || '').trim();
         out.tramites.push({ date: dateStr, user: userStr, desc: descStr });
         var block = (dateStr ? '[' + dateStr + ']' : '') + (dateStr && (userStr || descStr) ? ' - ' : '') + (userStr ? '[' + userStr + ']:' : '') + (userStr && descStr ? '\n' : '') + (descStr || '—');
@@ -960,7 +974,7 @@ function parseSSHtml(html) {
     out.tramitesCount = tramitesData.count;
     out.tramitesSummary = tramitesData.summary;
     out.tramites = tramitesData.tramites;
-    var allTd = doc.querySelectorAll('td.tableVisualizacaoField');
+    var allTd = doc.querySelectorAll('td.tableVisualizacaoField, td[class*="tableVisualizacaoField"]');
     for (var i = 0; i < allTd.length; i++) {
         var txt = getElementText(allTd[i]);
         if (!out.numero && txt.indexOf('Número:') === 0) { var m = txt.match(/Número:\s*(\d+)/); if (m) out.numero = m[1]; }
@@ -975,12 +989,12 @@ function parseSSHtml(html) {
         var dataFromRaw = html.match(/Data:[\s\S]*?(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
         if (dataFromRaw) out.ssData = parsePsaiDateToISO(dataFromRaw[1] + '/' + dataFromRaw[2] + '/' + dataFromRaw[3]);
     }
-    var destaque = doc.querySelectorAll('td.tableVisualizacaoDestaque');
+    var destaque = doc.querySelectorAll('td.tableVisualizacaoDestaque, td[class*="tableVisualizacaoDestaque"]');
     for (var di = 0; di < destaque.length; di++) {
         var dtxt = getElementText(destaque[di]);
         if (dtxt.indexOf('Situação:') !== -1 && !out.tipo) { out.tipo = dtxt.replace(/^\s*Situação:\s*/i, '').trim(); break; }
     }
-    var htmlCells = doc.querySelectorAll('td.tableVisualizacaoHtml');
+    var htmlCells = doc.querySelectorAll('td.tableVisualizacaoHtml, td[class*="tableVisualizacaoHtml"]');
     for (var j = 0; j < destaque.length; j++) {
         var label = getElementText(destaque[j]);
         if (label.indexOf('Assunto:') !== -1 && htmlCells[j] !== undefined) { out.assunto = getElementText(htmlCells[j]); continue; }
@@ -1050,7 +1064,7 @@ function parseSSHtml(html) {
             if (tdDet) out.detalheTecnico = getElementTextWithBreaks(tdDet);
         }
     }
-    var colspanCells = doc.querySelectorAll('td.tableVisualizacaoHtml[colspan="3"]');
+    var colspanCells = doc.querySelectorAll('td.tableVisualizacaoHtml[colspan="3"], td[class*="tableVisualizacaoHtml"][colspan="3"]');
     if (!out.detalheTecnico) {
         for (var k = 0; k < colspanCells.length; k++) {
             var t = getElementTextWithBreaks(colspanCells[k]);
@@ -1183,31 +1197,80 @@ function _ssEmpty(val) {
     return false;
 }
 
-function applyParsedSS(data) {
+function applyParsedSS(data, opts) {
     if (!currentId) return;
     var c = cases.find(function(x) { return x.id === currentId; });
     if (!c) return;
+    var force = opts && opts.force;
     var titleParts = [];
-    if (data.numero && _ssEmpty(c.ssNumero)) { c.ssNumero = data.numero; setVal('input-ss-numero', data.numero); }
-    if (data.ssData && _ssEmpty(c.ssData)) { c.ssData = data.ssData; setVal('input-ss-data', data.ssData); }
-    if (data.subtopic && _ssEmpty(c.ssSubtopic)) { c.ssSubtopic = data.subtopic; setVal('input-ss-subtopico', data.subtopic); }
-    if (data.tipo !== undefined && _ssEmpty(c.ssTipo)) c.ssTipo = data.tipo;
+
+    function applyNumero() {
+        if (force ? data.numero !== undefined : (data.numero && _ssEmpty(c.ssNumero))) {
+            c.ssNumero = data.numero || '';
+            setVal('input-ss-numero', c.ssNumero);
+        }
+    }
+    function applySsData() {
+        if (force ? data.ssData !== undefined : (data.ssData && _ssEmpty(c.ssData))) {
+            c.ssData = data.ssData || '';
+            setVal('input-ss-data', c.ssData);
+        }
+    }
+    function applySubtopic() {
+        if (force ? data.subtopic !== undefined : (data.subtopic && _ssEmpty(c.ssSubtopic))) {
+            c.ssSubtopic = data.subtopic || '';
+            setVal('input-ss-subtopico', c.ssSubtopic);
+        }
+    }
+    function applyTipo() {
+        if (force ? data.tipo !== undefined : (data.tipo !== undefined && _ssEmpty(c.ssTipo))) {
+            c.ssTipo = data.tipo || '';
+        }
+    }
+    applyNumero();
+    applySsData();
+    applySubtopic();
+    applyTipo();
     titleParts = [c.ssNumero, c.ssTipo, c.ssSubtopic].filter(Boolean);
     if (titleParts.length) { var autoTitle = titleParts.join(' · '); setVal('input-title', autoTitle); c.title = autoTitle; }
-    if (data.assunto && _ssEmpty(c.ssAssunto)) { c.ssAssunto = data.assunto; setVal('input-ss-assunto', data.assunto); }
-    if (data.problema && _ssEmpty(c.ssProblema)) { c.ssProblema = data.problema; setVal('input-ss-problema', data.problema); }
-    if (data.passos && _ssEmpty(c.ssPassos)) { c.ssPassos = data.passos; setVal('input-ss-passos', data.passos); }
-    if (data.bancoCliente !== undefined) { c.ssBancoCliente = !!data.bancoCliente; setCheck('input-ss-banco-cliente', data.bancoCliente); }
-    if (data.bancoClienteConteudo != null && _ssEmpty(c.ssBancoClienteConteudo)) { c.ssBancoClienteConteudo = data.bancoClienteConteudo; setVal('input-ss-banco-cliente-conteudo', data.bancoClienteConteudo); }
+
+    if (force ? data.assunto !== undefined : (data.assunto && _ssEmpty(c.ssAssunto))) {
+        c.ssAssunto = data.assunto || '';
+        setVal('input-ss-assunto', c.ssAssunto);
+    }
+    if (force ? data.problema !== undefined : (data.problema && _ssEmpty(c.ssProblema))) {
+        c.ssProblema = data.problema || '';
+        setVal('input-ss-problema', c.ssProblema);
+    }
+    if (force ? data.passos !== undefined : (data.passos && _ssEmpty(c.ssPassos))) {
+        c.ssPassos = data.passos || '';
+        setVal('input-ss-passos', c.ssPassos);
+    }
+    if (data.bancoCliente !== undefined) {
+        c.ssBancoCliente = !!data.bancoCliente;
+        setCheck('input-ss-banco-cliente', data.bancoCliente);
+    }
+    if (force ? data.bancoClienteConteudo !== undefined : (data.bancoClienteConteudo != null && _ssEmpty(c.ssBancoClienteConteudo))) {
+        c.ssBancoClienteConteudo = data.bancoClienteConteudo || '';
+        setVal('input-ss-banco-cliente-conteudo', c.ssBancoClienteConteudo);
+    }
     toggleBancoClienteConteudoVisibility();
-    if (data.detalheTecnico != null && _ssEmpty(c.ssDetalheTecnico)) { c.ssDetalheTecnico = data.detalheTecnico; setVal('input-ss-detalhe-tecnico', data.detalheTecnico); }
-    if (data.tramites && data.tramites.length && _ssEmpty(c.ssTramites)) {
-        c.ssTramites = data.tramites.slice();
-        c.ssTramitesCount = data.tramites.length;
-        c.ssResumoAI = (data.tramitesSummary || '').trim() || data.tramites.map(function(t) { return (t.date ? t.date + ' - ' : '') + (t.user ? t.user + ': ' : '') + (t.desc || '—'); }).join('\n');
-        renderTramitesList(c.ssTramites);
-    } else renderTramitesList(c.ssTramites || []);
-    if (data.tramitesCount != null && (c.ssTramitesCount == null || c.ssTramitesCount === undefined)) c.ssTramitesCount = data.tramitesCount;
+    if (force ? data.detalheTecnico !== undefined : (data.detalheTecnico != null && _ssEmpty(c.ssDetalheTecnico))) {
+        c.ssDetalheTecnico = data.detalheTecnico || '';
+        setVal('input-ss-detalhe-tecnico', c.ssDetalheTecnico);
+    }
+
+    if (force ? data.tramites !== undefined : (data.tramites && data.tramites.length && _ssEmpty(c.ssTramites))) {
+        c.ssTramites = data.tramites ? data.tramites.slice() : [];
+        c.ssTramitesCount = data.tramitesCount != null ? data.tramitesCount : (c.ssTramites ? c.ssTramites.length : 0);
+        c.ssResumoAI = (data.tramitesSummary || '').trim() || (c.ssTramites && c.ssTramites.length ? c.ssTramites.map(function(t) { return (t.date ? t.date + ' - ' : '') + (t.user ? t.user + ': ' : '') + (t.desc || '—'); }).join('\n') : '');
+        renderTramitesList(c.ssTramites || []);
+    } else {
+        renderTramitesList(c.ssTramites || []);
+    }
+    if (!force && data.tramitesCount != null && (c.ssTramitesCount == null || c.ssTramitesCount === undefined)) c.ssTramitesCount = data.tramitesCount;
+    if (force && data.tramitesCount != null) c.ssTramitesCount = data.tramitesCount;
+
     var badge = getEl('ss-tramites-badge');
     if (badge) {
         var n = c.ssTramitesCount != null ? c.ssTramitesCount : 0;
@@ -1217,7 +1280,7 @@ function applyParsedSS(data) {
     if (data.sscs && data.sscs.length) {
         c.links = (c.links || []).slice();
         data.sscs.forEach(function(item) {
-            if (item.code && !c.links.some(function(l) { return l.code === item.code; })) c.links.push({ code: item.code, link: item.link || '', desc: item.desc || '' });
+            if (item.code && !c.links.some(function(l) { return String(l.code) === String(item.code); })) c.links.push({ code: String(item.code).trim(), link: item.link || '', desc: item.desc || '' });
         });
     }
     updateSsTitleAuto(c);
@@ -2548,7 +2611,7 @@ document.addEventListener('DOMContentLoaded', function() {
             var html = getVal('ss-html-paste') || '';
             if (!html.trim()) { alert('Cole o HTML da SS ou envie um arquivo.'); return; }
             var data = parseSSHtml(html);
-            applyParsedSS(data);
+            applyParsedSS(data, { force: true });
             toggleModal('modal-ler-ss', false);
         },
         'btn-ler-ss-aba': function() {
@@ -2576,14 +2639,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     alert('Nenhuma aba aberta com a SS ' + ssNumero + '.\nAbra a página da SS ' + ssNumero + ' no navegador (sgd.dominiosistemas.com.br/sgsa/faces/ss.html?ss=' + ssNumero + ') e tente novamente.');
                     return;
                 }
-                chrome.tabs.sendMessage(tab.id, { action: 'SCRAPE_SS' }, function(response) {
+                chrome.runtime.sendMessage({ action: 'DP_SCRAPE_SS_TAB', ssNumero: ssNumero }, function(response) {
                     if (chrome.runtime.lastError) {
                         alert('Não foi possível ler a aba. Recarregue a página da SS (F5) e tente de novo.');
                         return;
                     }
                     if (response && response.html) {
                         var data = parseSSHtml(response.html);
-                        applyParsedSS(data);
+                        applyParsedSS(data, { force: true });
                         var badge = getEl('ss-tramites-badge');
                         if (badge) badge.textContent = (data.tramitesCount || 0) + ((data.tramitesCount || 0) === 1 ? ' Trâmite' : ' Trâmites');
                     } else if (response && response.error) {
